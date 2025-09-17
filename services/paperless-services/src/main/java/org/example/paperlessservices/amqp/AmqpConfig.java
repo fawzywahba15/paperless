@@ -1,10 +1,11 @@
-package org.example.paperlessservice.amqp;
+package org.example.paperlessservices.amqp;
 
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,10 +37,6 @@ public class AmqpConfig {
         return f;
     }
 
-    @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory cf) {
-        return new RabbitTemplate(cf);
-    }
 
     @Bean
     public Queue ocrQueue() {
@@ -49,5 +46,25 @@ public class AmqpConfig {
     @Bean
     public Queue resultQueue() {
         return new Queue(resultQueueName, true);
+    }
+    @Bean
+    public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
+        return new Jackson2JsonMessageConverter();
+    }
+
+
+
+/*
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory cf) {
+        return new RabbitTemplate(cf);
+    }
+*/
+
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory cf, Jackson2JsonMessageConverter conv) {
+        RabbitTemplate tpl = new RabbitTemplate(cf);
+        tpl.setMessageConverter(conv);
+        return tpl;
     }
 }

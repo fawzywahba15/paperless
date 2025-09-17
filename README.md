@@ -4,7 +4,19 @@ Ein verteiltes **Microservice-System** in **Java (Spring Boot)**, vollständig a
 Ziel: Dokumente über eine REST-API hochladen, Metadaten in PostgreSQL speichern, Dateien in MinIO ablegen, Nachrichten über RabbitMQ austauschen, und später Suche via Elasticsearch + KI-Worker.
 
 ---
-
+## Dienste & Ports
+- paperless-rest (8081), paperless-service (8082), paperless-web (8080/nginx)
+- postgres (5432), rabbitmq (5672 + UI 9093), minio (9000 + UI 9090), elasticsearch (9200), adminer (9091)
+---
+## Start/Stopp
+```bash
+docker compose --env-file .env up -d          # alle
+docker compose --env-file .env up -d paperless-rest
+docker compose --env-file .env up -d paperless-service
+docker compose --env-file .env stop
+docker compose logs -f paperless-rest
+```
+---
 ##  Architektur
 
 - **paperless-rest** (Spring Boot, Port 8081)
@@ -85,3 +97,31 @@ docker compose --env-file .env up -d
 - paperless-service verarbeitet das Dokument (OCR/KI)
 - Ergebnisse werden zurück an REST geschickt / in DB gespeichert
 - Elasticsearch dient zur späteren Suche
+
+## sprint 1  unit tests nachweisen
+
+```bash
+cd C:\Users\fawzi\Desktop\paperless\services\paperless-rest
+docker run --rm -v "${PWD}:/build" -w /build maven:3.9-eclipse-temurin-21 `
+  mvn -pl services/paperless-rest -am test
+
+```
+
+## sprint 2  unit tests nachweisen
+
+```bash
+# Images bauen (Docker erstellt die App-Container-Images neu)
+docker compose --env-file .env build paperless-rest
+docker compose --env-file .env build paperless-service
+
+# Stack starten (alle nötigen Container aus docker-compose.yml)
+docker compose --env-file .env up -d
+
+
+# Datei hochladen (Multipart/Form-Data, Feldname "file")
+curl -F "C:\Users\fawzi\Downloads\Lebenslauf.pdf" http://localhost:8081/api/documents
+
+# Status abfragen (Polling)
+curl http://localhost:8081/api/documents/<ID>
+
+```
