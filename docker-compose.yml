@@ -1,4 +1,3 @@
-version: "3.9"
 
 services:
   postgres:
@@ -58,6 +57,16 @@ services:
 
   # --- Platzhalter REST (hört auf 8081) ---
   paperless-rest:
+    environment:
+      SPRING_DATASOURCE_URL: ${POSTGRES_URL}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD}
     build:
       context: .
       dockerfile: services/paperless-rest/Dockerfile
@@ -68,13 +77,19 @@ services:
 
   # ---  SERVICE (hört auf 8082) ---
   paperless-service:
+
     build:
       context: .
       dockerfile: services/paperless-services/Dockerfile
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_URL: ${POSTGRES_URL}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      OCR_QUEUE: ${OCR_QUEUE}
+      RESULT_QUEUE: ${RESULT_QUEUE}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD}
     ports:
       - "${PAPERLESS_SERVICE_PORT}:8082"
     depends_on: [postgres, rabbitmq, minio, elasticsearch]

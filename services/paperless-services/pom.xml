@@ -23,6 +23,8 @@
     </properties>
 
     <dependencies>
+
+
         <!-- Minimal zum Starten -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
