@@ -1,0 +1,102 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./compose/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks: [paperless-net]
+
+  rabbitmq:
+    image: rabbitmq:${RABBITMQ_VERSION}
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_CONSOLE_PORT}:15672"
+    networks: [paperless-net]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "${ELASTIC_PORT}:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks: [paperless-net]
+
+  minio:
+    image: minio/minio:${MINIO_VERSION}
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    volumes:
+      - minio_data:/data
+    networks: [paperless-net]
+
+  adminer:
+    image: adminer:${ADMINER_VERSION}
+    ports:
+      - "${ADMINER_PORT}:8080"
+    depends_on: [postgres]
+    networks: [paperless-net]
+
+  # --- Platzhalter REST (hört auf 8081) ---
+  paperless-rest:
+    build:
+      context: .
+      dockerfile: services/paperless-rest/Dockerfile
+    ports:
+      - "${PAPERLESS_REST_PORT}:8081"
+    depends_on: [postgres, rabbitmq, minio, elasticsearch]
+    networks: [paperless-net]
+
+  # ---  SERVICE (hört auf 8082) ---
+  paperless-service:
+    build:
+      context: .
+      dockerfile: services/paperless-services/Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${PAPERLESS_SERVICE_PORT}:8082"
+    depends_on: [postgres, rabbitmq, minio, elasticsearch]
+    networks: [paperless-net]
+
+
+  paperless-web:
+    build:
+      context: ./services/paperless-web
+      dockerfile: Dockerfile
+      args:
+        NGINX_VERSION: 1.27-alpine
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on: [paperless-rest]
+    networks: [paperless-net]
+
+
+networks:
+  paperless-net:
+
+volumes:
+  db_data:
+  es_data:
+  minio_data:
