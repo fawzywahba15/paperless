@@ -8,4 +8,8 @@ public record DocumentResponseDto(
         String contentType,
         long size,
         String status
-) {}
+) {
+    public UUID getId() {
+        return id;
+    }
+}

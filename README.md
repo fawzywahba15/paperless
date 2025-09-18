@@ -118,6 +118,7 @@ docker compose --env-file .env build paperless-service
 docker compose --env-file .env up -d
 
 
+
 # Datei hochladen (Multipart/Form-Data, Feldname "file")
 curl -F "C:\Users\fawzi\Downloads\Lebenslauf.pdf" http://localhost:8081/api/documents
 
