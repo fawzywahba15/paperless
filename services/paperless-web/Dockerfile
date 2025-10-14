@@ -1,12 +1,16 @@
-# Wichtig: ARG vor FROM, sonst kommt der Build-Arg nicht an
+# services/paperless-web/Dockerfile
 ARG NGINX_VERSION=1.27-alpine
 FROM nginx:${NGINX_VERSION}
 
-# Wir sind im Kontext ./services/paperless-web,
-# d.h. "dist/" existiert direkt hier
+# 1) Default vhost entfernen (sonst verwirrend)
+RUN rm -f /etc/nginx/conf.d/default.conf
+
+# 2) Statisches Frontend ausliefern
 COPY dist/ /usr/share/nginx/html/
 
-# Diese Datei liegt relativ zum Repo-Root unter compose/nginx/nginx.conf.
-# Weil unser Kontext NICHT das Repo-Root ist, kopieren wir sie zuerst rein:
-# (Alternative: lege eine nginx.conf-Kopie in services/paperless-web/nginx.conf)
+# 3) Eigene Hauptkonfiguration
+#    (ACHTUNG: Datei muss im Build-Kontext ./services/paperless-web liegen!)
 COPY nginx.conf /etc/nginx/nginx.conf
+
+# 4) Build-Zeit-Validierung -> bricht sofort ab, wenn die Config nicht passt
+#RUN nginx -t
