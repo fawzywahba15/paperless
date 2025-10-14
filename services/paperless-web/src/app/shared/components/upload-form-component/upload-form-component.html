@@ -1,0 +1,20 @@
+<div class="upload-card">
+  <h2> Dokument hochladen</h2>
+
+  <div class="upload-zone" (click)="fileInput.click()">
+    <input #fileInput type="file" hidden (change)="onFileSelected($event)" />
+    <p *ngIf="!selectedFile">Klicke hier oder ziehe ein PDF herein</p>
+    <p *ngIf="selectedFile">Ausgewählt: {{ selectedFile.name }}</p>
+  </div>
+
+  <button (click)="uploadFile()" [disabled]="!selectedFile || isLoading">
+    {{ isLoading ? 'Wird hochgeladen...' : 'Hochladen' }}
+  </button>
+
+  <div *ngIf="uploadedDoc" class="result">
+    ✅ <strong>{{ uploadedDoc.filename }}</strong> wurde erfolgreich hochgeladen!
+    <pre>{{ uploadedDoc | json }}</pre>
+  </div>
+
+  <div *ngIf="errorMsg" class="error">{{ errorMsg }}</div>
+</div>

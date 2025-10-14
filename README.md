@@ -126,3 +126,32 @@ curl -F "C:\Users\fawzi\Downloads\Lebenslauf.pdf" http://localhost:8081/api/docu
 curl http://localhost:8081/api/documents/<ID>
 
 ```
+
+## sprint 3  nachweis
+
+```bash
+# Images bauen (Docker erstellt die App-Container-Images neu)
+docker compose --env-file .env build paperless-rest
+docker compose --env-file .env build paperless-service
+
+# Stack starten (alle nötigen Container aus docker-compose.yml)
+docker compose --env-file .env up -d
+
+
+
+# Datei hochladen in cmd
+
+curl -X POST http://localhost:8081/api/documents ^
+     -F "file=@C:/Users/Fawzy/Downloads/test.pdf"
+
+# Datei hochladen in IDE
+
+& "C:\Windows\System32\curl.exe" -X POST http://localhost:8081/api/documents -F "file=@C:/Users/Fawzy/Downloads/test.pdf"
+
+
+
+
+# Status abfragen (Polling)
+curl http://localhost:8081/api/documents/<ID>
+
+```
