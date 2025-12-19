@@ -1,16 +1,27 @@
-# services/paperless-web/Dockerfile
-ARG NGINX_VERSION=1.27-alpine
-FROM nginx:${NGINX_VERSION}
+# --- Stage 1: Build (Node.js) ---
+FROM node:20-alpine as build
+WORKDIR /app
 
-# 1) Default vhost entfernen (sonst verwirrend)
+# Dependencies installieren (Clean Install für Reproduzierbarkeit)
+COPY package*.json ./
+RUN npm ci
+
+# Source-Code kopieren und bauen
+COPY . .
+# Angular baut die App (Output landet in dist/paperless-web/browser)
+RUN npm run build
+
+# --- Stage 2: Runtime (Nginx) ---
+FROM nginx:1.27-alpine
+
+# 1) Default Config löschen
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-# 2) Statisches Frontend ausliefern
-COPY dist/ /usr/share/nginx/html/
+# 2) Das GEBAUTE Frontend kopieren
+# WICHTIG: Angular 17+ Application Builder nutzt den Unterordner /browser
+COPY --from=build /app/dist/paperless-web/browser /usr/share/nginx/html/
 
-# 3) Eigene Hauptkonfiguration
-#    (ACHTUNG: Datei muss im Build-Kontext ./services/paperless-web liegen!)
+# 3) Eigene Nginx Config kopieren
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# 4) Build-Zeit-Validierung -> bricht sofort ab, wenn die Config nicht passt
-#RUN nginx -t
+EXPOSE 80
