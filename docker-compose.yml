@@ -90,7 +90,6 @@ services:
 
   # ---  SERVICE (hört auf 8082) ---
   paperless-service:
-
     build:
       context: .
       dockerfile: services/paperless-services/Dockerfile
@@ -103,6 +102,7 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASS: ${RABBITMQ_PASSWORD}
+      MINIO_BUCKET_NAME: documents
     ports:
       - "${PAPERLESS_SERVICE_PORT}:8082"
     depends_on:

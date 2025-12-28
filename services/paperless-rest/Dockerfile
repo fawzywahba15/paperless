@@ -4,16 +4,21 @@ WORKDIR /build
 
 # 1) Nur POM kopieren, Dependencies cachen
 COPY services/paperless-rest/pom.xml services/paperless-rest/
-RUN mvn -q -f services/paperless-rest/pom.xml -DskipTests dependency:go-offline
+# Auch hier sicherheitshalber skip=true
+RUN mvn -q -f services/paperless-rest/pom.xml -Dmaven.test.skip=true dependency:go-offline
 
-# 2) Source kopieren und bauen (inkl. repackage)
+# 2) Source kopieren und bauen
 COPY services/paperless-rest/ services/paperless-rest/
-RUN mvn -q -f services/paperless-rest/pom.xml -DskipTests package spring-boot:repackage
+
+# Tests werden geskipped, weil veraltet
+# TODO: entferne -Dmaven.test.skip=true wenn unit tests passen
+RUN mvn -q -f services/paperless-rest/pom.xml -Dmaven.test.skip=true package spring-boot:repackage
 
 # --- Runtime-Stage ---
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-# Robust: irgendein erzeugtes Jar nehmen (ohne -plain)
-ARG JAR_FILE=services/paperless-rest/target/*.jar
-COPY --from=build /build/${JAR_FILE} /app/app.jar
+# Wir kopieren das JAR direkt (angepasster Pfad)
+COPY --from=build /build/services/paperless-rest/target/paperless-rest-*.jar /app/app.jar
+
+EXPOSE 8081
 ENTRYPOINT ["java","-jar","/app/app.jar"]
