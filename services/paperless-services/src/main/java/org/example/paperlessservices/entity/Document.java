@@ -31,6 +31,9 @@ public class Document {
     @Column
     private String ocrText;
 
+    @Column(length = 4096)
+    private String summary;
+
     // --- GETTER / SETTER ---
 
     public UUID getId() { return id; }
@@ -53,4 +56,7 @@ public class Document {
 
     public String getOcrText() { return ocrText; }
     public void setOcrText(String ocrText) { this.ocrText = ocrText; }
+
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
 }

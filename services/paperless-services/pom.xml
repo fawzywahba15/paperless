@@ -105,12 +105,16 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- MinIO Client (S3-kompatibel) -->
         <dependency>
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
-            <version>8.5.11</version>
-            <scope>test</scope>
+            <version>8.5.7</version>
+        </dependency>
+
+        <dependency>
+            <groupId>net.sourceforge.tess4j</groupId>
+            <artifactId>tess4j</artifactId>
+            <version>5.9.0</version>
         </dependency>
 
 

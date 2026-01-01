@@ -1,9 +1,6 @@
 package org.example.paperlessrest.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
 import java.util.UUID;
 
@@ -20,6 +17,9 @@ public class Document {
 
     private String objectKey;
     private String status;
+
+    @Column(length = 4096)
+    private String summary;
 
     // getters & setters
     public UUID getId() { return id; }
@@ -40,7 +40,8 @@ public class Document {
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
-    public void setOcrText(String s) {
+    public void setOcrText(String s) { }
 
-    }
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
 }
