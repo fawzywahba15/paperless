@@ -20,6 +20,9 @@ public class AmqpConfig {
     @Value("${RESULT_QUEUE:result.queue}")
     private String resultQueueName;
 
+    @Value("${GENAI_QUEUE:genai.queue}")
+    private String genAiQueueName;
+
     @Value("${RABBITMQ_HOST:rabbitmq}")
     private String rabbitHost;
 
@@ -37,7 +40,6 @@ public class AmqpConfig {
         return f;
     }
 
-
     @Bean
     public Queue ocrQueue() {
         return new Queue(ocrQueueName, true);
@@ -47,19 +49,16 @@ public class AmqpConfig {
     public Queue resultQueue() {
         return new Queue(resultQueueName, true);
     }
+
+    @Bean
+    public Queue genAiQueue() {
+        return new Queue(genAiQueueName, true);
+    }
+
     @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
-
-
-
-/*
-    @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory cf) {
-        return new RabbitTemplate(cf);
-    }
-*/
 
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory cf, Jackson2JsonMessageConverter conv) {

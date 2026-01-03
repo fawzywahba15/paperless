@@ -12,6 +12,7 @@ import org.example.paperlessservices.service.port.ResultProducerPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -29,14 +30,22 @@ public class OcrConsumer {
     private final DocumentRepository repo;
     private final ResultProducerPort resultProducer;
     private final MinioClient minioClient;
+    private final RabbitTemplate rabbitTemplate;
 
     @Value("${MINIO_BUCKET_NAME:paperless-bucket}")
     private String bucketName;
 
-    public OcrConsumer(DocumentRepository repo, ResultProducerPort resultProducer, MinioClient minioClient) {
+    @Value("${GENAI_QUEUE:genai.queue}") // Name der Ziel-Queue
+    private String genAiQueue;
+
+    public OcrConsumer(DocumentRepository repo,
+                       ResultProducerPort resultProducer,
+                       MinioClient minioClient,
+                       RabbitTemplate rabbitTemplate) {
         this.repo = repo;
         this.resultProducer = resultProducer;
         this.minioClient = minioClient;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     @RabbitListener(queues = "${OCR_QUEUE:ocr.queue}")
@@ -48,7 +57,6 @@ public class OcrConsumer {
             // --- RETRY LOGIK ---
             Document doc = null;
             int maxRetries = 10;
-
             for (int i = 0; i < maxRetries; i++) {
                 var documentOptional = repo.findById(docId);
                 if (documentOptional.isPresent()) {
@@ -82,7 +90,7 @@ public class OcrConsumer {
             Files.copy(stream, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             stream.close();
 
-            // 3. Tesseract Setup (MIT KORREKTEM PFAD!)
+            // 3. Tesseract Setup
             ITesseract tesseract = new Tesseract();
             tesseract.setDatapath("/usr/share/tesseract-ocr/5/tessdata");
             tesseract.setLanguage("eng");
@@ -97,9 +105,14 @@ public class OcrConsumer {
             doc.setStatus(DocumentStatus.COMPLETED);
             repo.save(doc);
 
-            // 5. Result
+            // 5. Result an Frontend senden
             resultProducer.publishCompleted(docId, ocrText);
-            log.info("Processing finished successfully for {}", docId);
+
+            // an GenAI Worker senden
+            log.info("Sending document {} to GenAI queue: {}", docId, genAiQueue);
+            // Wir senden die gleiche Message (nur ID) weiter
+            rabbitTemplate.convertAndSend(genAiQueue, msg);
+
 
         } catch (Exception e) {
             log.error("OCR processing failed for {}", docId, e);
