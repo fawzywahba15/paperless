@@ -12,7 +12,7 @@ COPY services/paperless-rest/ services/paperless-rest/
 
 # Tests werden geskipped, weil veraltet
 # TODO: entferne -Dmaven.test.skip=true wenn unit tests passen
-RUN mvn -q -f services/paperless-rest/pom.xml -Dmaven.test.skip=true package spring-boot:repackage
+RUN mvn -q -f services/paperless-rest/pom.xml package spring-boot:repackage
 
 # --- Runtime-Stage ---
 FROM eclipse-temurin:21-jre

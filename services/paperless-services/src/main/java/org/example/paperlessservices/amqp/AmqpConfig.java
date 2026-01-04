@@ -66,4 +66,18 @@ public class AmqpConfig {
         tpl.setMessageConverter(conv);
         return tpl;
     }
+
+    @org.springframework.context.annotation.Bean
+    public net.sourceforge.tess4j.ITesseract tesseract() {
+        net.sourceforge.tess4j.ITesseract instance = new net.sourceforge.tess4j.Tesseract();
+        instance.setDatapath("/usr/share/tesseract-ocr/5/tessdata");
+        instance.setLanguage("eng");
+        return instance;
+    }
+
+    @org.springframework.context.annotation.Bean
+    public org.springframework.web.client.RestTemplate restTemplate() {
+        return new org.springframework.web.client.RestTemplate();
+    }
+
 }

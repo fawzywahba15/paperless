@@ -1,7 +1,9 @@
 package org.example.paperlessrest.dto;
 
-import org.springframework.web.multipart.MultipartFile;
+import lombok.Data;
 
-public record DocumentRequestDto(
-        MultipartFile file
-) {}
+@Data
+public class DocumentRequestDto {
+    private String title;
+    private String category;
+}

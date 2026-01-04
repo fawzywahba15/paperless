@@ -5,6 +5,7 @@ import org.example.paperlessrest.entity.Document;
 import org.example.paperlessrest.entity.DocumentStatus;
 import org.example.paperlessrest.repository.DocumentRepository;
 import org.example.paperlessrest.service.port.DocumentStoragePort;
+import org.example.paperlessrest.service.port.OcrProducerPort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,11 +17,14 @@ public class DocumentService {
 
     private final DocumentRepository repo;
     private final DocumentStoragePort storagePort;
+    private final OcrProducerPort ocrProducerPort;
 
     public DocumentService(DocumentRepository repo,
-                           DocumentStoragePort storagePort) {
+                           DocumentStoragePort storagePort,
+                           OcrProducerPort ocrProducerPort) {
         this.repo = repo;
         this.storagePort = storagePort;
+        this.ocrProducerPort = ocrProducerPort;
     }
 
     public Document uploadAndDispatch(MultipartFile file) throws Exception {
@@ -40,8 +44,11 @@ public class DocumentService {
         doc.setObjectKey(objectKey);
         doc.setStatus(String.valueOf(DocumentStatus.PENDING));
 
-        // saveAndFlush, um sicherzustellen, dass die Transaktion committed ist, bevor die Nachricht an RabbitMQ geht (verhindert Race Conditions).
+        // Speichern
         doc = repo.saveAndFlush(doc);
+
+        // 3) Nachricht an RabbitMQ senden
+        ocrProducerPort.sendForOcr(doc.getId(), objectKey);
 
         return doc;
     }
