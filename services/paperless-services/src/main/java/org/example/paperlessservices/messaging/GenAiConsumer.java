@@ -31,13 +31,12 @@ public class GenAiConsumer {
     @Value("${GEMINI_API_KEY}")
     private String apiKey;
 
-    // modell 1.5
     private static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=";
 
-    public GenAiConsumer(DocumentRepository repo) {
+    public GenAiConsumer(DocumentRepository repo, RestTemplate restTemplate) {
         this.repo = repo;
+        this.restTemplate = restTemplate;
         this.objectMapper = new ObjectMapper();
-        this.restTemplate = new RestTemplate();
     }
 
     @RabbitListener(queues = "${GENAI_QUEUE:genai.queue}")
@@ -49,6 +48,7 @@ public class GenAiConsumer {
             // 1. Dokument aus DB laden
             Document doc = repo.findById(docId).orElseThrow(() -> new RuntimeException("Doc not found"));
 
+            // Check auf null UND leer
             if (doc.getOcrText() == null || doc.getOcrText().isBlank()) {
                 log.warn("No OCR text found for document {}. Skipping GenAI summary.", docId);
                 return;
@@ -56,18 +56,17 @@ public class GenAiConsumer {
 
             log.info("Sending text (len={}) to Google Gemini...", doc.getOcrText().length());
 
-            // 2. JSON Request für Gemini bauen
+            // 2. JSON Request bauen
             ObjectNode rootNode = objectMapper.createObjectNode();
             ArrayNode contentsArray = rootNode.putArray("contents");
             ObjectNode contentNode = contentsArray.addObject();
             ArrayNode partsArray = contentNode.putArray("parts");
             ObjectNode textNode = partsArray.addObject();
 
-            // Prompt:
-            String prompt = "Fasse biite das folgende Dokument kurz und knapp auf Deutsch zusammen:\n\n" + doc.getOcrText();
+            String prompt = "Fasse bitte das folgende Dokument kurz und knapp auf Deutsch zusammen:\n\n" + doc.getOcrText();
             textNode.put("text", prompt);
 
-            // 3. HTTP Request senden
+            // 3. Request senden
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> request = new HttpEntity<>(rootNode.toString(), headers);
@@ -77,14 +76,13 @@ public class GenAiConsumer {
 
             // 4. Antwort parsen
             JsonNode responseRoot = objectMapper.readTree(jsonResponse);
-            // Pfad zur Antwort
             String summary = responseRoot.path("candidates").get(0)
                     .path("content").path("parts").get(0)
                     .path("text").asText();
 
             log.info("Gemini summary received: {}", summary);
 
-            // 5. In der DB speichern
+            // 5. Speichern
             doc.setSummary(summary);
             repo.save(doc);
             log.info("Summary saved to DB for document {}", docId);

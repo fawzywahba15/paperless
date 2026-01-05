@@ -1,32 +1,40 @@
 package org.example.paperlessrest.controller;
 
-import org.example.paperlessrest.entity.Document;
+import org.example.paperlessrest.dto.DocumentRequestDto;
 import org.example.paperlessrest.service.DocumentService;
-import org.example.paperlessrest.service.port.OcrProducerPort; // Neu hier!
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/documents")
+@CrossOrigin(origins = "http://localhost:4200")
 public class DocumentController {
 
-    private final DocumentService service;
-    private final OcrProducerPort producerPort; // Wir holen den Producer hier rein
+    private final DocumentService documentService;
 
-    public DocumentController(DocumentService service, OcrProducerPort producerPort) {
-        this.service = service;
-        this.producerPort = producerPort;
+    public DocumentController(DocumentService documentService) {
+        this.documentService = documentService;
     }
 
-    @PostMapping(consumes = "multipart/form-data")
-    public ResponseEntity<Document> upload(@RequestPart("file") MultipartFile file) throws Exception {
-        // 1. Schritt: Speichern in DB & MinIO (Transaktion wird hier abgeschlossen)
-        Document savedDoc = service.uploadAndDispatch(file);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadDocument(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "title", required = false) String title
+    ) {
+        try {
+            DocumentRequestDto dto = new DocumentRequestDto();
+            dto.setTitle(title != null ? title : file.getOriginalFilename());
+            dto.setCategory("Uncategorized");
 
-        // 2. Schritt: Nachricht senden (erst JETZT, wo die DB sicher fertig ist)
-        producerPort.sendForOcr(savedDoc.getId(), savedDoc.getObjectKey());
+            documentService.uploadAndDispatch(file);
 
-        return ResponseEntity.accepted().body(savedDoc);
+            return ResponseEntity.status(HttpStatus.CREATED).build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
     }
 }

@@ -1,63 +1,35 @@
 package org.example.paperlessrest.controller;
 
-import org.example.paperlessrest.TestDoublesConfig;
-import org.example.paperlessrest.dto.DocumentResponseDto;
-import org.example.paperlessrest.entity.Document;
-import org.example.paperlessrest.entity.DocumentStatus;
-import org.example.paperlessrest.repository.DocumentRepository;
 import org.example.paperlessrest.service.DocumentService;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DocumentController.class)
-@ActiveProfiles("test")
-@Import(TestDoublesConfig.class)
 class DocumentControllerTest {
 
-//todo frontend multipath file - und in spring genauso
     @Autowired
-    DocumentRepository repo;
-    @Autowired
-    MockMvc mvc;
+    private MockMvc mockMvc;
 
     @MockBean
-    DocumentService service;
+    private DocumentService documentService;
 
     @Test
-    void getReturns200WhenFound() throws Exception {
-        var id = UUID.randomUUID();
-        var doc = new Document();
-        doc.setId(id);
-        doc.setFilename("x.pdf");
-        doc.setContentType("application/pdf");
-        doc.setSize(1L);
-        doc.setObjectKey("k");
-        doc.setStatus(String.valueOf(DocumentStatus.PENDING));
-        repo.save(doc);
+    void upload_ShouldReturn201_WhenUploadSucceeds() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "test.pdf", MediaType.APPLICATION_PDF_VALUE, "Dummy Content".getBytes()
+        );
 
-        mvc.perform(get("/api/documents/{id}", id))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void getReturns404WhenMissing() throws Exception {
-        UUID id = UUID.randomUUID();
-        given(service.find(id)).willReturn(Optional.empty());
-
-        mvc.perform(get("/api/documents/{id}", id))
-                .andExpect(status().isNotFound());
+        mockMvc.perform(multipart("/api/documents")
+                        .file(file)
+                        .param("title", "Mein Dokument"))
+                .andExpect(status().isCreated());
     }
 }

@@ -1,15 +1,22 @@
 package org.example.paperlessrest.entity;
 
 import jakarta.persistence.*;
-
+import lombok.*;
 import java.util.UUID;
 
 @Entity
+@Data // automatisch Getter, Setter, ToString, HashCode
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Document {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
+
+    private String title;
+    private String category;
 
     private String filename;
     private String contentType;
@@ -18,30 +25,10 @@ public class Document {
     private String objectKey;
     private String status;
 
+    // Felder für die Worker-Ergebnisse
+    @Column(length = 10000)
+    private String ocrText;
+
     @Column(length = 4096)
     private String summary;
-
-    // getters & setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-
-    public String getFilename() { return filename; }
-    public void setFilename(String filename) { this.filename = filename; }
-
-    public String getContentType() { return contentType; }
-    public void setContentType(String contentType) { this.contentType = contentType; }
-
-    public long getSize() { return size; }
-    public void setSize(long size) { this.size = size; }
-
-    public String getObjectKey() { return objectKey; }
-    public void setObjectKey(String objectKey) { this.objectKey = objectKey; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-
-    public void setOcrText(String s) { }
-
-    public String getSummary() { return summary; }
-    public void setSummary(String summary) { this.summary = summary; }
 }

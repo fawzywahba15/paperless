@@ -1,59 +1,70 @@
 package org.example.paperlessrest.service;
 
 import org.example.paperlessrest.entity.Document;
-import org.junit.jupiter.api.Disabled;
 import org.example.paperlessrest.repository.DocumentRepository;
 import org.example.paperlessrest.service.port.DocumentStoragePort;
 import org.example.paperlessrest.service.port.OcrProducerPort;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.ActiveProfiles;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.multipart.MultipartFile;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
+import java.io.InputStream;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-@DataJpaTest
-@ActiveProfiles("test")
+@ExtendWith(MockitoExtension.class)
 class DocumentServiceTest {
 
-    @Autowired
-    DocumentRepository repo;
+    @Mock private DocumentRepository repo;
+    @Mock private DocumentStoragePort storagePort;
+    @Mock private OcrProducerPort ocrProducerPort;
+    @Mock private MultipartFile file;
 
-    @MockBean
-    DocumentStoragePort storagePort;
+    private DocumentService service;
 
-    @MockBean
-    OcrProducerPort producerPort;
+    @BeforeEach
+    void setUp() {
+        // Wir injizieren die Mocks
+        service = new DocumentService(repo, storagePort, ocrProducerPort);
+    }
 
-    //: Refactor für Sprint 5/6.
-    // Grund: Der DocumentService-Konstruktor hat sich in Sprint 4 geändert (RabbitMQ ist jetzt im Controller).
-    // Die Tests müssen mit Mockito angepasst werden, um den neuen Flow widerzuspiegeln.
-    @Disabled("Vorerst deaktiviert wegen Refactoring in Sprint 4. Muss gefixt werden!")
     @Test
-    void uploadAndDispatch_storesAndPublishes() throws Exception {
-        // arrange
-        DocumentService service = new DocumentService(repo, storagePort, producerPort);
-        MockMultipartFile file = new MockMultipartFile(
-                "file","doc.pdf","application/pdf","hello".getBytes()
-        );
-        when(storagePort.store(anyString(), anyString(), anyLong(), any())).thenReturn("obj-123");
+    void uploadAndDispatch_ShouldSaveAndNotifyQueue() throws Exception {
+        // --- ARRANGE ---
+        when(file.getOriginalFilename()).thenReturn("invoice.pdf");
+        when(file.getContentType()).thenReturn("application/pdf");
+        when(file.getSize()).thenReturn(100L);
+        when(file.getInputStream()).thenReturn(InputStream.nullInputStream());
 
-        // act
-        Document saved = service.uploadAndDispatch(file);
+        // MinIO Mock: gibt key zurück
+        when(storagePort.store(any(), any(), anyLong(), any())).thenReturn("invoice.pdf");
 
-        // assert DB
-        assertThat(saved.getId()).isNotNull();
-        assertThat(saved.getObjectKey()).isEqualTo("obj-123");
+        // DB Mock: gibt gespeichertes Doc mit ID zurück
+        when(repo.saveAndFlush(any(Document.class))).thenAnswer(i -> {
+            Document d = i.getArgument(0);
+            d.setId(UUID.randomUUID());
+            return d;
+        });
 
-        // assert Ports
-        verify(storagePort).store(eq("doc.pdf"), eq("application/pdf"), eq(5L), any());
-        ArgumentCaptor<java.util.UUID> idCap = ArgumentCaptor.forClass(java.util.UUID.class);
-        verify(producerPort).sendForOcr(idCap.capture(), eq("obj-123"));
-        assertThat(idCap.getValue()).isEqualTo(saved.getId());
+        // --- ACT ---
+        service.uploadAndDispatch(file);
+
+        // --- ASSERT ---
+
+        // 1. MinIO aufgerufen?
+        verify(storagePort).store(any(), any(), anyLong(), any());
+
+        // 2. DB aufgerufen?
+        verify(repo).saveAndFlush(any(Document.class));
+
+        // 3. Wurde RabbitMQ benachrichtigt?
+        verify(ocrProducerPort).sendForOcr(any(UUID.class), eq("invoice.pdf"));
     }
 }

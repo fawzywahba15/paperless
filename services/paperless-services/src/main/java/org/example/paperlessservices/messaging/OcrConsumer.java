@@ -3,7 +3,6 @@ package org.example.paperlessservices.messaging;
 import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import net.sourceforge.tess4j.ITesseract;
-import net.sourceforge.tess4j.Tesseract;
 import org.example.paperlessservices.dto.DocumentMessage;
 import org.example.paperlessservices.entity.Document;
 import org.example.paperlessservices.entity.DocumentStatus;
@@ -31,21 +30,24 @@ public class OcrConsumer {
     private final ResultProducerPort resultProducer;
     private final MinioClient minioClient;
     private final RabbitTemplate rabbitTemplate;
+    private final ITesseract tesseract;
 
     @Value("${MINIO_BUCKET_NAME:paperless-bucket}")
     private String bucketName;
 
-    @Value("${GENAI_QUEUE:genai.queue}") // Name der Ziel-Queue
+    @Value("${GENAI_QUEUE:genai.queue}")
     private String genAiQueue;
 
     public OcrConsumer(DocumentRepository repo,
                        ResultProducerPort resultProducer,
                        MinioClient minioClient,
-                       RabbitTemplate rabbitTemplate) {
+                       RabbitTemplate rabbitTemplate,
+                       ITesseract tesseract) {
         this.repo = repo;
         this.resultProducer = resultProducer;
         this.minioClient = minioClient;
         this.rabbitTemplate = rabbitTemplate;
+        this.tesseract = tesseract;
     }
 
     @RabbitListener(queues = "${OCR_QUEUE:ocr.queue}")
@@ -54,7 +56,6 @@ public class OcrConsumer {
         UUID docId = msg.documentId();
 
         try {
-            // --- RETRY LOGIK ---
             Document doc = null;
             int maxRetries = 10;
             for (int i = 0; i < maxRetries; i++) {
@@ -72,13 +73,11 @@ public class OcrConsumer {
                 return;
             }
 
-            // 1. Status auf PROCESSING
-            doc.setStatus(DocumentStatus.PROCESSING);
+            doc.setStatus(String.valueOf(DocumentStatus.PROCESSING));
             repo.save(doc);
 
             log.info("Starting OCR for ObjectKey: {}", doc.getObjectKey());
 
-            // 2. MinIO Laden
             InputStream stream = minioClient.getObject(
                     GetObjectArgs.builder()
                             .bucket(bucketName)
@@ -90,36 +89,30 @@ public class OcrConsumer {
             Files.copy(stream, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             stream.close();
 
-            // 3. Tesseract Setup
-            ITesseract tesseract = new Tesseract();
-            tesseract.setDatapath("/usr/share/tesseract-ocr/5/tessdata");
-            tesseract.setLanguage("eng");
-
+            //Nutzen das injizierte Tesseract Objekt
             String ocrText = tesseract.doOCR(tempFile);
+
             tempFile.delete();
 
             log.info("OCR finished. Text length: {}", ocrText.length());
 
-            // 4. Speichern
             doc.setOcrText(ocrText);
-            doc.setStatus(DocumentStatus.COMPLETED);
+            doc.setStatus(String.valueOf(DocumentStatus.COMPLETED));
             repo.save(doc);
 
-            // 5. Result an Frontend senden
             resultProducer.publishCompleted(docId, ocrText);
 
-            // an GenAI Worker senden
             log.info("Sending document {} to GenAI queue: {}", docId, genAiQueue);
-            // Wir senden die gleiche Message (nur ID) weiter
             rabbitTemplate.convertAndSend(genAiQueue, msg);
-
 
         } catch (Exception e) {
             log.error("OCR processing failed for {}", docId, e);
-            repo.findById(docId).ifPresent(d -> {
-                d.setStatus(DocumentStatus.FAILED);
-                repo.save(d);
-            });
+            if (repo.existsById(docId)) { // Safety check
+                repo.findById(docId).ifPresent(d -> {
+                    d.setStatus(String.valueOf(DocumentStatus.FAILED));
+                    repo.save(d);
+                });
+            }
             resultProducer.publishFailed(docId, e.getMessage());
         }
     }
