@@ -1,5 +1,6 @@
 package org.example.paperlessrest.controller;
 
+import org.example.paperlessrest.repository.ElasticSearchRepository;
 import org.example.paperlessrest.service.DocumentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,11 +24,18 @@ class DocumentControllerTest {
     @MockBean
     private DocumentService documentService;
 
+    @MockBean
+    private ElasticSearchRepository elasticRepository;
+
+
     @Test
     void upload_ShouldReturn201_WhenUploadSucceeds() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "test.pdf", MediaType.APPLICATION_PDF_VALUE, "Dummy Content".getBytes()
         );
+
+        // check dass der Service-Mock nichts tut (Success Case)
+        when(documentService.uploadAndDispatch(any())).thenReturn(null);
 
         mockMvc.perform(multipart("/api/documents")
                         .file(file)

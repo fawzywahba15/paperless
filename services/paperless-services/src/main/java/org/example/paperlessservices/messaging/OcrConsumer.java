@@ -14,6 +14,8 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.example.paperlessservices.repository.ElasticSearchRepository;
+import org.example.paperlessservices.search.ElasticDocument;
 
 import java.io.File;
 import java.io.InputStream;
@@ -31,6 +33,7 @@ public class OcrConsumer {
     private final MinioClient minioClient;
     private final RabbitTemplate rabbitTemplate;
     private final ITesseract tesseract;
+    private final ElasticSearchRepository elasticRepository;
 
     @Value("${MINIO_BUCKET_NAME:paperless-bucket}")
     private String bucketName;
@@ -42,12 +45,14 @@ public class OcrConsumer {
                        ResultProducerPort resultProducer,
                        MinioClient minioClient,
                        RabbitTemplate rabbitTemplate,
-                       ITesseract tesseract) {
+                       ITesseract tesseract,
+                       ElasticSearchRepository elasticRepository) {
         this.repo = repo;
         this.resultProducer = resultProducer;
         this.minioClient = minioClient;
         this.rabbitTemplate = rabbitTemplate;
         this.tesseract = tesseract;
+        this.elasticRepository = elasticRepository;
     }
 
     @RabbitListener(queues = "${OCR_QUEUE:ocr.queue}")
@@ -99,6 +104,20 @@ public class OcrConsumer {
             doc.setOcrText(ocrText);
             doc.setStatus(String.valueOf(DocumentStatus.COMPLETED));
             repo.save(doc);
+
+            // Indexing in ElasticSearch
+            try {
+                ElasticDocument elasticDoc = ElasticDocument.builder()
+                        .id(doc.getId().toString())
+                        .title(doc.getTitle())
+                        .content(ocrText)
+                        .build();
+
+                elasticRepository.save(elasticDoc);
+                log.info("Document {} indexed in ElasticSearch.", docId);
+            } catch (Exception e) {
+                log.error("Failed to index document in ElasticSearch (DB is safe): {}", e.getMessage());
+            }
 
             resultProducer.publishCompleted(docId, ocrText);
 

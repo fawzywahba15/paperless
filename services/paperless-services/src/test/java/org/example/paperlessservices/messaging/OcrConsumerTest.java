@@ -8,6 +8,7 @@ import org.example.paperlessservices.dto.DocumentMessage;
 import org.example.paperlessservices.entity.Document;
 import org.example.paperlessservices.entity.DocumentStatus;
 import org.example.paperlessservices.repository.DocumentRepository;
+import org.example.paperlessservices.repository.ElasticSearchRepository;
 import org.example.paperlessservices.service.port.ResultProducerPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,20 +36,22 @@ class OcrConsumerTest {
     @Mock private MinioClient minioClient;
     @Mock private RabbitTemplate rabbitTemplate;
     @Mock private ITesseract tesseract;
+    @Mock private ElasticSearchRepository elasticRepository;
 
     private OcrConsumer ocrConsumer;
 
     @BeforeEach
     void setUp() {
-        ocrConsumer = new OcrConsumer(repo, resultProducer, minioClient, rabbitTemplate, tesseract);
+        ocrConsumer = new OcrConsumer(repo, resultProducer, minioClient, rabbitTemplate, tesseract, elasticRepository);
+
         ReflectionTestUtils.setField(ocrConsumer, "genAiQueue", "genai.queue");
         ReflectionTestUtils.setField(ocrConsumer, "bucketName", "paperless-bucket");
     }
 
     @Test
     void handle_ShouldProcessOcrAndSendToGenAi() throws Exception {
+        // Arrange
         UUID docId = UUID.randomUUID();
-        // Hier passen wir uns an deinen Code an: DocumentMessage hat bei dir 2 Felder (UUID, String)
         DocumentMessage msg = new DocumentMessage(docId, "test.pdf");
 
         Document doc = new Document();
@@ -59,15 +62,21 @@ class OcrConsumerTest {
         when(repo.findById(docId)).thenReturn(Optional.of(doc));
         when(tesseract.doOCR(any(File.class))).thenReturn("Mocked OCR Text");
 
-        // MinIO Mocking (die komplizierte Stelle)
+        // MinIO Mocking
         InputStream fakeStream = new ByteArrayInputStream("PDF".getBytes());
-        GetObjectResponse getObjectResponse = new GetObjectResponse(null, "bucket", null, "obj", fakeStream);
-        when(minioClient.getObject(any(GetObjectArgs.class))).thenReturn(getObjectResponse);
+        when(minioClient.getObject(any(GetObjectArgs.class))).thenReturn(new GetObjectResponse(null, "bucket", null, "obj", fakeStream));
 
+        // Act
         ocrConsumer.handle(msg);
 
+        // Assert
         assertEquals(String.valueOf(DocumentStatus.COMPLETED), doc.getStatus());
         assertEquals("Mocked OCR Text", doc.getOcrText());
+
+        // check, ob RabbitMQ benachrichtigt wurde
         verify(rabbitTemplate).convertAndSend(eq("genai.queue"), eq(msg));
+
+        // check, ob in ElasticSearch gespeichert wurde
+        verify(elasticRepository, times(1)).save(any());
     }
 }
