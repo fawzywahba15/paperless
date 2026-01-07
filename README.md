@@ -63,20 +63,33 @@ Das Projekt deckt alle Anforderungen der Sprints 1 bis 6 ab:
 ### Starten der Anwendung
 Das gesamte System wird über Docker Compose gestartet. Es ist keine lokale Installation von Datenbanken oder Java notwendig.
 
+---
 1.  **Repository klonen:**
     ```bash
     git clone https://github.com/fawzywahba15/paperless
     cd paperless
     ```
+---
+2. **API Key Konfiguration**
 
-2.  **System bauen und starten:**
+Aus Sicherheitsgründen ist der echte API-Key nicht im Repository enthalten. Damit die KI-Funktionen (Document Summarization) funktionieren, ist eine lokale Konfiguration nötig:
+
+1. Öffnen Sie die Datei `.env` im Hauptverzeichnis.
+2. Suchen Sie die Variable `GEMINI_API_KEY`.
+3.  Ersetzen Sie den Platzhalter durch Ihren echten Google Gemini API Key:
+
+    ```env
+    GEMINI_API_KEY="YourKey"
+    ```
+---
+3. **System bauen und starten:**
     Dieser Befehl baut die Java-JARs, die Angular-App und erstellt die Docker-Images.
     ```bash
     docker-compose up --build
     ```
     *(Der erste Start kann einige Minuten dauern, da Maven-Abhängigkeiten und Docker-Images geladen werden.)*
-
-3.  **Warten auf Bereitschaft:**
+---
+4. **Warten auf Bereitschaft:**
     Warten Sie, bis in den Logs `Started PaperlessRestApplication` und `Started PaperlessServiceApplication` erscheint.
 
 ---
