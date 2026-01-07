@@ -6,6 +6,4 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ElasticSearchRepository extends ElasticsearchRepository<ElasticDocument, String> {
-    // Der Worker muss meistens nur speichern (save), daher brauchen wir hier noch keine speziellen Suchmethoden.
-    // Die Standard-Methoden (save, findById, delete) sind automatisch da.
 }

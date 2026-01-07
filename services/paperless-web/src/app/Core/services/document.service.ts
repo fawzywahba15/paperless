@@ -2,38 +2,49 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, catchError, throwError } from 'rxjs';
 import { API_CONFIG } from '../../shared/utils/api.config';
-// @ts-ignore
-import { DocumentResponse } from '../models/document.model';
+
+// Interface für Suchergebnisse
+export interface Document {
+  id: string;
+  title: string;
+  content?: string;
+  filename?: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class DocumentService {
+  // Basis URL für Dokumente
   private readonly baseUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DOCUMENTS}`;
+  // Basis URL für Sharing (manuell bauen, falls sie nicht in der config ist)
+  private readonly shareUrl = `${API_CONFIG.BASE_URL}/share`;
 
   constructor(private http: HttpClient) {}
 
-  uploadDocument(file: File): Observable<DocumentResponse> {
+  uploadDocument(file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
 
-    return this.http.post<DocumentResponse>(this.baseUrl, formData, {
+    return this.http.post(this.baseUrl, formData, {
       observe: 'body',
       responseType: 'json'
     }).pipe(
-      catchError((error: HttpErrorResponse) => {
-        console.error(' [DocumentService] Upload-Fehler:', error);
-        if (error.status === 0) {
-          console.error(' Backend nicht erreichbar oder CORS-Problem.');
-        } else if (error.status === 400) {
-          console.error('️ Ungültige Anfrage – evtl. fehlender Parameter.');
-        } else if (error.status >= 500) {
-          console.error(' Serverfehler beim Upload.');
-        }
-        return throwError(() => new Error('Upload fehlgeschlagen.'));
-      })
+      catchError(this.handleError)
     );
   }
 
-  getDocument(id: string): Observable<DocumentResponse> {
-    return this.http.get<DocumentResponse>(`${this.baseUrl}/${id}`);
+  // Suche
+  searchDocuments(query: string): Observable<Document[]> {
+    return this.http.get<Document[]>(`${this.baseUrl}/search?query=${query}`);
+  }
+
+  // Sharing
+  shareDocument(id: string): Observable<string> {
+    // responseType: 'text', weil das Backend einen String zurückgibt
+    return this.http.post(`${this.shareUrl}/${id}`, {}, { responseType: 'text' });
+  }
+
+  private handleError(error: HttpErrorResponse) {
+    console.error(' [DocumentService] Fehler:', error);
+    return throwError(() => new Error('Aktion fehlgeschlagen.'));
   }
 }
