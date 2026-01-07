@@ -1,1 +1,51 @@
-<router-outlet></router-outlet>
+<div class="app-container">
+  <header class="main-header">
+    <h1>Paperless UI</h1>
+  </header>
+
+  <div class="upload-container">
+    <app-upload-form (uploadSuccess)="onSearch()"></app-upload-form>
+  </div>
+
+  <hr class="divider">
+
+  <section class="search-section">
+    <h2>Search Archive</h2>
+    <div class="search-bar">
+      <input
+        type="text"
+        [(ngModel)]="searchQuery"
+        (keyup.enter)="onSearch()"
+        placeholder="Search documents (e.g. 'Wien', 'Invoice')..."
+      >
+      <button class="btn-primary" (click)="onSearch()" [disabled]="isLoading">
+        {{ isLoading ? 'Searching...' : '🔍 Search' }}
+      </button>
+    </div>
+  </section>
+
+  <section class="results-section" *ngIf="documents.length > 0">
+    <h3>Found {{ documents.length }} Documents:</h3>
+
+    <div class="document-list">
+      <div *ngFor="let doc of documents" class="document-card">
+        <div class="doc-info">
+          <h4>{{ doc.title || doc.filename || 'Untitled Document' }}</h4>
+          <small>ID: {{ doc.id }}</small>
+
+          <p class="snippet" *ngIf="doc.content">
+            "{{ doc.content.substring(0, 150) }}..."
+          </p>
+        </div>
+
+        <div class="doc-actions">
+          <button class="btn-share" (click)="onShare(doc)">🔗 Share</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p *ngIf="documents.length === 0 && searchQuery && !isLoading" class="no-results">
+    No documents found. Try uploading one first!
+  </p>
+</div>

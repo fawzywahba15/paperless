@@ -1,22 +1,21 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { DocumentService } from '../../../Core/services/document.service';
-// @ts-ignore
-import { DocumentResponse } from '../../../Core/models/document.model';
-import { JsonPipe, NgIf } from '@angular/common';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-upload-form',
-  templateUrl: './upload-form-component.html',
   standalone: true,
-  imports: [NgIf, JsonPipe],
+  imports: [CommonModule],
+  templateUrl: './upload-form-component.html',
   styleUrls: ['./upload-form-component.css']
 })
 export class UploadFormComponent {
   selectedFile?: File;
-  uploadedDoc?: DocumentResponse;
   isLoading = false;
   errorMsg = '';
   successMsg = '';
+
+  @Output() uploadSuccess = new EventEmitter<void>();
 
   constructor(private documentService: DocumentService) {}
 
@@ -24,32 +23,34 @@ export class UploadFormComponent {
     const input = event.target as HTMLInputElement;
     if (input.files?.length) {
       this.selectedFile = input.files[0];
-      console.log(' Datei ausgewählt:', this.selectedFile.name);
+      this.errorMsg = '';
+      this.successMsg = '';
     }
   }
 
   uploadFile(): void {
-    if (!this.selectedFile) {
-      this.errorMsg = '⚠ Bitte zuerst eine Datei auswählen.';
-      return;
-    }
+    if (!this.selectedFile) return;
 
     this.isLoading = true;
     this.errorMsg = '';
     this.successMsg = '';
-    console.log(' Upload gestartet...');
 
     this.documentService.uploadDocument(this.selectedFile).subscribe({
       next: (res) => {
-        console.log(' Upload erfolgreich:', res);
-        this.uploadedDoc = res;
-        this.successMsg = `Datei "${res.filename}" wurde erfolgreich hochgeladen!`;
+        console.log('Upload success:', res);
         this.isLoading = false;
+        this.successMsg = 'Upload erfolgreich! Verarbeitung läuft...';
+
+        // Datei-Auswahl leeren
+        this.selectedFile = undefined;
+
+        // Parent benachrichtigen
+        this.uploadSuccess.emit();
       },
       error: (err) => {
-        console.error(' Upload fehlgeschlagen:', err);
-        this.errorMsg = 'Upload fehlgeschlagen. Bitte Verbindung oder Server prüfen.';
+        console.error('Upload error:', err);
         this.isLoading = false;
+        this.errorMsg = 'Upload fehlgeschlagen: ' + (err.message || 'Server Error');
       }
     });
   }

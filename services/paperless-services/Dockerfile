@@ -4,8 +4,6 @@ WORKDIR /build
 COPY . .
 
 # Baue nur den Worker Service
-# -Dmaven.test.skip=true hinzugefügt
-# TODO: entferne -Dmaven.test.skip=true wenn unit tests passen
 RUN mvn -q -pl services/paperless-services -am package
 
 # --- Runtime-Stage ---
