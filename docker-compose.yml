@@ -1,147 +1,173 @@
 services:
   postgres:
-    image: postgres:${POSTGRES_VERSION}
+    image: postgres:${POSTGRES_VERSION:-16}
+    container_name: postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-paperless}
+      POSTGRES_USER: ${POSTGRES_USER:-paperless}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-paperless}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./compose/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # init.sql entfernt, da POSTGRES_DB die Datenbank automatisch erstellt (weniger Fehlerquellen)
     networks: [paperless-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
-    image: rabbitmq:${RABBITMQ_VERSION}
+    image: rabbitmq:${RABBITMQ_VERSION:-3.13-management}
+    container_name: rabbitmq
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     ports:
-      - "${RABBITMQ_PORT}:5672"
-      - "${RABBITMQ_CONSOLE_PORT}:15672"
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_CONSOLE_PORT:-9093}:15672"
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
-      interval: 5s
-      timeout: 5s
+      interval: 10s
+      timeout: 10s
       retries: 5
     networks: [paperless-net]
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION}
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.14.3}
+    container_name: elasticsearch
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     ports:
-      - "${ELASTIC_PORT}:9200"
+      - "${ELASTIC_PORT:-9200}:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
     networks: [paperless-net]
-    # --- Healthcheck  ---
     healthcheck:
       test: "curl -s http://localhost:9200 >/dev/null || exit 1"
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 10s
+      start_period: 20s
 
   minio:
-    image: minio/minio:${MINIO_VERSION}
+    image: minio/minio:${MINIO_VERSION:-latest}
+    container_name: minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9090}:9001"
     volumes:
       - minio_data:/data
     networks: [paperless-net]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
   adminer:
-    image: adminer:${ADMINER_VERSION}
+    image: adminer:${ADMINER_VERSION:-latest}
+    container_name: adminer
     ports:
-      - "${ADMINER_PORT}:8080"
+      - "${ADMINER_PORT:-9091}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
     depends_on: [postgres]
     networks: [paperless-net]
 
-  # --- Platzhalter REST (hört auf 8081) ---
+  # --- BACKEND REST (Port 8081) ---
   paperless-rest:
-    environment:
-      SPRING_DATASOURCE_URL: ${POSTGRES_URL}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASS: ${RABBITMQ_PASSWORD}
-      ELASTIC_SEARCH_URI: ${ELASTIC_SEARCH_URI}
     build:
       context: .
       dockerfile: services/paperless-rest/Dockerfile
+    container_name: paperless-rest
+    environment:
+      SPRING_DATASOURCE_URL: ${POSTGRES_URL:-jdbc:postgresql://postgres:5432/paperless}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-paperless}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-paperless}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: documents
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD:-guest}
+      OCR_QUEUE: ${OCR_QUEUE:-ocr.queue}
+      ELASTIC_SEARCH_URI: ${ELASTIC_SEARCH_URI:-http://elasticsearch:9200}
+    ports:
+      - "${PAPERLESS_REST_PORT:-8081}:8081"
     depends_on:
       rabbitmq:
         condition: service_healthy
       postgres:
-        condition: service_started
+        condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_started # Minio healthcheck manchmal flaky, started reicht
       elasticsearch:
         condition: service_healthy
-    ports:
-      - "${PAPERLESS_REST_PORT}:8081"
-
     networks: [paperless-net]
 
-  # ---  SERVICE (hört auf 8082) ---
+  # --- BACKEND SERVICE / WORKER (Port 8082) ---
   paperless-service:
     build:
       context: .
       dockerfile: services/paperless-services/Dockerfile
+    container_name: paperless-service
     environment:
-      SPRING_DATASOURCE_URL: ${POSTGRES_URL}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      OCR_QUEUE: ${OCR_QUEUE}
-      RESULT_QUEUE: ${RESULT_QUEUE}
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: ${RABBITMQ_USER}
-      RABBITMQ_PASS: ${RABBITMQ_PASSWORD}
+      SPRING_DATASOURCE_URL: ${POSTGRES_URL:-jdbc:postgresql://postgres:5432/paperless}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-paperless}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-paperless}
+      OCR_QUEUE: ${OCR_QUEUE:-ocr.queue}
+      RESULT_QUEUE: ${RESULT_QUEUE:-result.queue}
+      GENAI_QUEUE: ${GENAI_QUEUE:-genai.queue}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD:-guest}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BUCKET_NAME: documents
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      GENAI_QUEUE: ${GENAI_QUEUE}
-      ELASTIC_SEARCH_URI: ${ELASTIC_SEARCH_URI}
+      ELASTIC_SEARCH_URI: ${ELASTIC_SEARCH_URI:-http://elasticsearch:9200}
+      # WICHTIG: Default Wert verhindert Crash, wenn Key fehlt
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-INSERT_YOUR_KEY_HERE}
     ports:
-      - "${PAPERLESS_SERVICE_PORT}:8082"
+      - "${PAPERLESS_SERVICE_PORT:-8082}:8082"
     depends_on:
       rabbitmq:
         condition: service_healthy
       postgres:
-        condition: service_started
+        condition: service_healthy
       minio:
         condition: service_started
       elasticsearch:
         condition: service_healthy
     networks: [paperless-net]
 
-
+  # --- FRONTEND (Port 8080) ---
   paperless-web:
     build:
       context: ./services/paperless-web
       dockerfile: Dockerfile
       args:
-        NGINX_VERSION: 1.27-alpine
+        NGINX_VERSION: ${NGINX_VERSION:-1.27-alpine}
+    container_name: paperless-web
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on: [paperless-rest]
     networks: [paperless-net]
 
-
 networks:
   paperless-net:
+    driver: bridge
 
 volumes:
   db_data:
