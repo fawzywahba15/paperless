@@ -1,30 +1,35 @@
 package org.example.paperlessservices.entity;
+
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
-import org.example.paperlessservices.entity.AccessLog;
-
 @Entity
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Table(name = "access_log")
 public class AccessLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private LocalDateTime accessedAt;
 
-    // Zugriff erfolgreich?
     private boolean successful;
 
+    // nullable = true, weil der Batch-Import keinen Link hat
     @ManyToOne
-    @JoinColumn(name = "share_link_id", nullable = false)
+    @JoinColumn(name = "share_link_id", nullable = true)
     private ShareLink shareLink;
+
+    @Column(name = "document_id")
+    private Long documentId;
+
+    @Column(name = "log_message")
+    private String logMessage;
 }

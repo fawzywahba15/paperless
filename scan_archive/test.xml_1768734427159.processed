@@ -1,0 +1,6 @@
+<AccessLogs>
+    <Entry>
+        <DocumentId>1</DocumentId>
+        <User>TestUser</User>
+    </Entry>
+</AccessLogs>

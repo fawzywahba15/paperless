@@ -1,19 +1,23 @@
 # Paperless - Verteiltes Dokumentenmanagementsystem
 
-Ein modernes, Microservice-basiertes System zur Archivierung, Verarbeitung und Suche von Dokumenten. Entwickelt im Rahmen des Semesterprojekts (Sprints 1-6).
+Ein modernes, Microservice-basiertes System zur Archivierung, Verarbeitung und Suche von Dokumenten. Entwickelt im Rahmen des Semesterprojekts (Sprints 1-7).
 
-Das System ermöglicht den Upload von PDFs, extrahiert Text mittels OCR (Tesseract), generiert KI-Zusammenfassungen (Google Gemini), speichert Daten relational (PostgreSQL) sowie als Objekte (MinIO) und ermöglicht eine performante Volltextsuche (ElasticSearch).
+Das System ermöglicht den Upload von PDFs, extrahiert Text mittels OCR (Tesseract), generiert KI-Zusammenfassungen (Google Gemini), speichert Daten relational (PostgreSQL) sowie als Objekte (MinIO) und ermöglicht eine performante Volltextsuche (ElasticSearch). Zusätzlich werden externe Zugriffsdaten über einen automatisierten Batch-Prozess importiert.
 
 ---
 
 ## 🚀 Features & Highlights
 
-Das Projekt deckt alle Anforderungen der Sprints 1 bis 6 ab:
+Das Projekt deckt alle Anforderungen der Sprints 1 bis 7 ab:
 
 * **📄 Dokumenten-Upload:**
     * Upload via Web-UI (Angular) oder REST API.
     * Speicherung der Originaldatei in **MinIO** (S3-kompatibler Object Storage).
     * Speicherung der Metadaten in **PostgreSQL**.
+* **🔄 Automatisierter Batch-Import:**
+    * Überwachung des Dateisystems (scan_input) auf neue XML-Zugriffslogs.
+    * Automatischer Import in die Datenbank und Archivierung der verarbeiteten Dateien.
+    * Konfigurierbare Pfade und Zeitplanung (Scheduling).
 * **⚙️ Asynchrone Verarbeitung (Messaging):**
     * Nutzung von **RabbitMQ** zur Entkopplung von Upload und Verarbeitung.
     * Skalierbare Worker-Architektur.
@@ -40,7 +44,7 @@ Das Projekt deckt alle Anforderungen der Sprints 1 bis 6 ab:
 * **Datenbank:** PostgreSQL 16 (Hibernate/JPA)
 * **Search Engine:** ElasticSearch 8
 * **Object Storage:** MinIO
-* **Tools:** Lombok, MapStruct (Entity-DTO Mapping), Maven
+* **Tools:** Lombok, MapStruct (Entity-DTO Mapping), Jackson (XML/JSON), Maven
 
 ### Frontend
 * **Framework:** Angular 18 (Standalone Components)
@@ -74,7 +78,7 @@ Das gesamte System wird über Docker Compose gestartet. Es ist keine lokale Inst
 
 Aus Sicherheitsgründen ist der echte API-Key nicht im Repository enthalten. Damit die KI-Funktionen (Document Summarization) funktionieren, ist eine lokale Konfiguration nötig:
 
-1. Öffnen Sie die Datei `.env` im Hauptverzeichnis.
+1. Öffnen Sie die Datei `.env.sample` im Hauptverzeichnis.
 2. Suchen Sie die Variable `GEMINI_API_KEY`.
 3.  Ersetzen Sie den Platzhalter durch Ihren echten Google Gemini API Key:
 
@@ -117,7 +121,7 @@ Damit Sie sich direkt in die Verwaltungsoberflächen einloggen können:
 
 ---
 
-### Workflow testen (Der "Happy Path")
+### Workflow 1: Dokumenten-Upload, KI (Der "Happy Path")
 
 1.  Öffnen Sie das **Web UI** (`http://localhost:8080`).
 2.  Laden Sie ein PDF-Dokument über das Upload-Formular hoch.
@@ -126,34 +130,57 @@ Damit Sie sich direkt in die Verwaltungsoberflächen einloggen können:
     * RabbitMQ Nachricht -> OCR Worker extrahiert Text.
     * GenAI Worker -> Erstellt Zusammenfassung.
     * Indexer -> Speichert Text in ElasticSearch.
-4.  Nutzen Sie die **Suchleiste**: Suchen Sie nach einem Wort, das *im* PDF vorkommt (z.B. "Rechnung", "Wien"). Das Dokument sollte erscheinen.
-5.  Klicken Sie auf **"Share"**, kopieren Sie den Link und testen Sie den Download in einem neuen Tab.
+4.  Nutzen Sie die **Suchleiste**: Suchen Sie nach einem Wort, das im PDF vorkommt (z.B. "Rechnung", "Wien"). Das Dokument sollte erscheinen.
 
 ---
 
-## ✅ Qualitätssicherung & Unit-Tests
+### Workflow 2: Batch-Import testen
+
+Der Batch-Service überwacht Ordner auf XML-Dateien, um externe Access-Logs zu importieren.
+
+1.  Navigieren Sie im Projektordner zu ./scan_input.
+2.  Kopieren Sie die bereitgestellte Beispieldatei sample_access_log.xml in diesen Ordner.
+
+Hinweis: Der Scheduler läuft zu Demo-Zwecken alle 30 Sekunden (Produktionseinstellung für 01:00 Uhr ist im Code dokumentiert).
+3.  Warten Sie ca. 30 Sekunden.
+4.  Ergebnis prüfen:
+
+Die Datei wurde automatisch in den Ordner ./scan_archive verschoben (und umbenannt).
+
+In der Datenbank (Tabelle access_log) sind neue Einträge sichtbar (via Adminer).
+
+---
+
+### Workflow 3: Document Sharing
+
+1.  Klicken Sie im UI auf den "Share" Button bei einem Dokument.
+2.  Ein Link wird generiert. Beim Aufruf wird das Dokument heruntergeladen.
+3.  Dieser Zugriff wird in der Datenbank protokolliert.
+
+---
+
+## ✅ Qualitätssicherung & Tests
 
 Das Projekt verfügt über eine umfassende Test-Suite, die kritische Pfade und Business-Logik absichert (Code Coverage > 70%).
 
-### Was wird getestet?
-* **Controller Layer:** `DocumentControllerTest` prüft HTTP-Endpunkte und Status-Codes.
-* **Service Layer:** `DocumentServiceTest` und `ShareServiceTest` validieren die Geschäftslogik (Upload, Sharing, Logging).
-* [cite_start]**Worker Services:** `OcrConsumerTest` und `GenAiConsumerTest` simulieren die asynchrone Verarbeitung (RabbitMQ, MinIO, External APIs).
+### 1. Integration Tests (REST API)
+Für den Use-Case "Document Upload" wurde ein robuster Integrationstest implementiert:
 
-### Tests ausführen
+* **Strategie:** Verwendung von `@WebMvcTest` (Slice Testing).
+* **Ablauf:** Der Test prüft den Controller-Layer, das JSON-Mapping und die HTTP-Statuscodes. Externe Abhängigkeiten (DB, MinIO, ElasticSearch) werden gemockt, um Stabilität in der CI/CD-Pipeline (Docker Build) zu garantieren, ohne auf schwere
+* **Ausführung:** Erfolgt automatisch bei jedem `docker-compose build`.
 
-**Option 1: Automatisch im Docker Build**
-Die Tests werden automatisch ausgeführt, wenn der Container gebaut wird. Ein erfolgreicher Start (`docker-compose up --build`) bestätigt, dass alle Tests grün sind.
+### 2. Unit Tests
 
-**Option 2: Manuell (Lokal)**
-Sie können die Tests auch ohne Docker direkt mit Maven ausführen:
+* **Worker Services:** Validierung der Business-Logik für OCR und GenAI-Verarbeitung.
+* **Mapping** Tests für Entity-DTO Konvertierungen.
 
 ```bash
-# Beispiel für REST Service
+# REST Tests
 cd services/paperless-rest
 ./mvnw test
 
-# Beispiel für Worker Service
+# Service/Worker Tests
 cd services/paperless-services
 ./mvnw test
 ```
@@ -162,7 +189,7 @@ cd services/paperless-services
 
 ## 🧪 Additional Use-Case: Document Sharing
 
-Dieser Use-Case (Sprint 6) demonstriert die Erweiterung des Datenmodells und der Business-Logik.
+Dieser Use-Case demonstriert die Erweiterung des Datenmodells und der Business-Logik.
 
 * **Funktion:** Benutzer können Dokumente temporär freigeben.
 * **Neue Entities:**
@@ -176,26 +203,34 @@ Dieser Use-Case (Sprint 6) demonstriert die Erweiterung des Datenmodells und der
 
 ---
 
-## ⚠️ Troubleshooting
-
-1. Upload hängt? 
-* Prüfen Sie die Logs (docker-compose logs -f paperless-service), ob Tesseract OCR läuft.
-
-2. Suche findet nichts? 
-* Warten Sie einige Sekunden nach dem Upload (ElasticSearch Indexierung ist asynchron).
-
-3. Datenbank-Fehler? 
-* Führen Sie docker-compose down -v aus, um die Volumes zu löschen und mit einer frischen DB zu starten.
-
 ## 📂 Projektstruktur
 
 ```plaintext
 paperless/
-├── compose/                # Konfigurationsdateien für Infrastruktur (DB, Nginx, ES)
+├── compose/                # Configs (DB, Nginx, ElasticSearch)
+├── scan_input/             # Watch-Folder für Batch Import
+├── scan_archive/           # Archiv für verarbeitete Batch-Dateien
 ├── services/
-│   ├── paperless-rest/     # Spring Boot Backend (API, Controller, Entities)
-│   ├── paperless-services/ # Spring Boot Worker (OCR, Search, GenAI Listener)
-│   └── paperless-web/      # Angular Frontend
-├── docker-compose.yml      # Orchestrierung aller Container
-└── README.md               # Diese Datei
+│   ├── paperless-rest/     # Backend API (Spring Boot)
+│   ├── paperless-services/ # Worker Service (OCR, Batch, GenAI)
+│   └── paperless-web/      # Frontend (Angular)
+├── docker-compose.yml      # Orchestrierung
+├── sample_access_log.xml   # Testdatei für Batch Import
+└── README.md               # Dokumentation
 
+```
+
+---
+
+## ⚠️ Troubleshooting
+
+1. Upload hängt?
+* Prüfen Sie die Logs (docker-compose logs -f paperless-service), ob Tesseract OCR läuft.
+
+2. Suche findet nichts?
+* Warten Sie einige Sekunden nach dem Upload (ElasticSearch Indexierung ist asynchron).
+
+3. Datenbank-Fehler?
+* Führen Sie docker-compose down -v aus, um die Volumes zu löschen und mit einer frischen DB zu starten.
+
+---
