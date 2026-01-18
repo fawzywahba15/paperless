@@ -1,2 +1,38 @@
-
+# --- Secrets & Config ---
 .env
+.env.local
+.env.backup
+*.key
+*.pem
+secrets/
+
+# --- Java / Maven (Compiled Code) ---
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+out/
+
+# --- Frontend (NodeJS / Angular / React) ---
+node_modules/
+dist/
+npm-debug.log
+yarn-error.log
+test-report.xml
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- OS Junk Files ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
