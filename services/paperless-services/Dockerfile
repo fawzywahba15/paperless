@@ -3,12 +3,10 @@ FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY . .
 
-# Baue nur den Worker Service
-RUN mvn -q -pl services/paperless-services -am package
+RUN mvn -q -pl services/paperless-services -am package -DskipTests
 
 # --- Runtime-Stage ---
 FROM eclipse-temurin:21-jre
-
 
 # Tesseract und Sprachpakete installieren
 RUN apt-get update && \
@@ -16,7 +14,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-# Kopiere das Jar
 COPY --from=build /build/services/paperless-services/target/paperless-services-*.jar /app/app.jar
 
 EXPOSE 8082
