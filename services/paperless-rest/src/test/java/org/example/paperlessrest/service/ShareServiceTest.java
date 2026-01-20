@@ -1,15 +1,15 @@
 package org.example.paperlessrest.service;
 
+import io.minio.MinioClient;
 import org.example.paperlessrest.entity.AccessLog;
 import org.example.paperlessrest.entity.Document;
 import org.example.paperlessrest.entity.ShareLink;
 import org.example.paperlessrest.repository.AccessLogRepository;
 import org.example.paperlessrest.repository.DocumentRepository;
 import org.example.paperlessrest.repository.ShareLinkRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,7 +19,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ShareServiceTest {
@@ -27,13 +29,10 @@ class ShareServiceTest {
     @Mock private ShareLinkRepository shareLinkRepository;
     @Mock private AccessLogRepository accessLogRepository;
     @Mock private DocumentRepository documentRepository;
+    @Mock private MinioClient minioClient; // Für den FileStream Test
 
+    @InjectMocks
     private ShareService shareService;
-
-    @BeforeEach
-    void setUp() {
-        shareService = new ShareService(shareLinkRepository, accessLogRepository, documentRepository);
-    }
 
     @Test
     void createShareLink_ShouldGenerateToken() {
@@ -47,7 +46,7 @@ class ShareServiceTest {
 
         // Assert
         assertNotNull(token);
-        assertEquals(8, token.length()); // Wir nutzen ja substring(0, 8)
+        assertEquals(8, token.length()); // Wir nutzen substring(0, 8)
 
         // Wurde gespeichert?
         verify(shareLinkRepository).save(any(ShareLink.class));
@@ -72,7 +71,7 @@ class ShareServiceTest {
         // Assert
         assertEquals(doc, result);
         // Access Log muss geschrieben werden
-        verify(accessLogRepository).save(any(AccessLog.class));
+        verify(accessLogRepository).save(argThat(AccessLog::isSuccessful));
     }
 
     @Test
@@ -89,7 +88,7 @@ class ShareServiceTest {
         // Act & Assert
         assertThrows(RuntimeException.class, () -> shareService.getDocumentByToken(token));
 
-        // Trotzdem Loggen (Failure Log)
-        verify(accessLogRepository).save(any(AccessLog.class));
+        // Trotzdem Loggen (als failed)
+        verify(accessLogRepository).save(argThat(log -> !log.isSuccessful()));
     }
 }

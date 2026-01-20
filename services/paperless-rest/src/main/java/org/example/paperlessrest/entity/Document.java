@@ -1,11 +1,19 @@
 package org.example.paperlessrest.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.UUID;
 
+/**
+ * Die zentrale Entität für ein gespeichertes Dokument.
+ * Speichert Metadaten, Referenzen zum Object-Storage (MinIO) und Ergebnisse der Worker (OCR/KI).
+ */
 @Entity
-@Data // automatisch Getter, Setter, ToString, HashCode
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -22,13 +30,16 @@ public class Document {
     private String contentType;
     private long size;
 
+    // Referenz auf die Datei im MinIO Object Storage
     private String objectKey;
+
     private String status;
 
-    // Felder für die Worker-Ergebnisse
-    @Column(length = 10000)
+    // Ergebnis des OCR-Prozesses (großer Textblob)
+    @Column(columnDefinition = "TEXT")
     private String ocrText;
 
+    // Ergebnis der Generative AI (Zusammenfassung)
     @Column(length = 4096)
     private String summary;
 }

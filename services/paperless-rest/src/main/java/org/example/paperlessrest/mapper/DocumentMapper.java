@@ -5,11 +5,16 @@ import org.example.paperlessrest.entity.Document;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-// "componentModel = spring" macht es zur @Component -> Autowired möglich
+/**
+ * MapStruct Mapper für die Konvertierung zwischen Entity und DTOs.
+ */
 @Mapper(componentModel = "spring")
 public interface DocumentMapper {
 
-    // MapStruct generiert die Implementierung automatisch beim Kompilieren
-    @Mapping(target = "filename", source = "filename")
+    /**
+     * Konvertiert Document Entity in Response DTO.
+     * Mappt das Datenbank-Feld 'ocrText' auf das Frontend-Feld 'content'.
+     */
+    @Mapping(target = "content", source = "ocrText")
     DocumentResponseDto entityToDto(Document document);
 }

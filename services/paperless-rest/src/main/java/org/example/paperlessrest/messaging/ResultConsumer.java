@@ -1,7 +1,6 @@
 package org.example.paperlessrest.messaging;
 
 import org.example.paperlessrest.dto.DocumentResultMessage;
-import org.example.paperlessrest.entity.Document;
 import org.example.paperlessrest.entity.DocumentStatus;
 import org.example.paperlessrest.repository.DocumentRepository;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;

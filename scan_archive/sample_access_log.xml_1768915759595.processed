@@ -1,0 +1,12 @@
+<AccessLogs>
+    <Entry>
+        <DocumentId>1</DocumentId>
+        <User>SystemAudit</User>
+        <AccessType>BATCH</AccessType>
+    </Entry>
+    <Entry>
+        <DocumentId>2</DocumentId>
+        <User>ExternalSystem</User>
+        <AccessType>DOWNLOAD</AccessType>
+    </Entry>
+</AccessLogs>

@@ -1,3 +1,8 @@
 package org.example.paperlessservices.entity;
 
-public enum DocumentStatus { PENDING, PROCESSING, COMPLETED, FAILED }
+/**
+ * Definiert die Zustände im Lebenszyklus eines Dokuments.
+ */
+public enum DocumentStatus {
+    PENDING, PROCESSING, COMPLETED, FAILED
+}

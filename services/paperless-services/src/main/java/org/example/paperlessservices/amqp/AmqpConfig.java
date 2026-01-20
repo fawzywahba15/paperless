@@ -1,5 +1,7 @@
 package org.example.paperlessservices.amqp;
 
+import net.sourceforge.tess4j.ITesseract;
+import net.sourceforge.tess4j.Tesseract;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
@@ -9,7 +11,12 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
 
+/**
+ * Zentrale Konfiguration für Messaging (RabbitMQ) und externe Tools.
+ * Definiert Queues, Message-Converter sowie Beans für Tesseract OCR und RestTemplate.
+ */
 @EnableRabbit
 @Configuration
 public class AmqpConfig {
@@ -40,6 +47,8 @@ public class AmqpConfig {
         return f;
     }
 
+    // --- Queue Definitionen ---
+
     @Bean
     public Queue ocrQueue() {
         return new Queue(ocrQueueName, true);
@@ -55,8 +64,11 @@ public class AmqpConfig {
         return new Queue(genAiQueueName, true);
     }
 
+    // --- Converter & Template ---
+
     @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
+        // Konvertiert Java-Objekte automatisch in JSON für die Queue
         return new Jackson2JsonMessageConverter();
     }
 
@@ -67,17 +79,25 @@ public class AmqpConfig {
         return tpl;
     }
 
-    @org.springframework.context.annotation.Bean
-    public net.sourceforge.tess4j.ITesseract tesseract() {
-        net.sourceforge.tess4j.ITesseract instance = new net.sourceforge.tess4j.Tesseract();
+    // --- Externe Tool Beans ---
+
+    /**
+     * Konfiguriert die Tesseract OCR Engine.
+     * Der Datapath zeigt auf das Verzeichnis im Docker-Container (/usr/share/tesseract-ocr/...).
+     */
+    @Bean
+    public ITesseract tesseract() {
+        ITesseract instance = new Tesseract();
         instance.setDatapath("/usr/share/tesseract-ocr/5/tessdata");
         instance.setLanguage("eng");
         return instance;
     }
 
-    @org.springframework.context.annotation.Bean
-    public org.springframework.web.client.RestTemplate restTemplate() {
-        return new org.springframework.web.client.RestTemplate();
+    /**
+     * RestTemplate für HTTP-Aufrufe an externe APIs (z.b. google gemini).
+     */
+    @Bean
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
     }
-
 }

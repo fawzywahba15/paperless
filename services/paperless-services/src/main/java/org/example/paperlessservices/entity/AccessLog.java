@@ -5,6 +5,12 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entität zur Protokollierung von Zugriffen.
+ * Diese Klasse wird dual genutzt:
+ * 1. Für Zugriffe auf Share-Links (Sprint 6).
+ * 2. Für importierte Logs aus dem XML-Batch-Import (Sprint 7).
+ */
 @Entity
 @Getter
 @Setter
@@ -13,6 +19,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Table(name = "access_log")
 public class AccessLog {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,12 +29,15 @@ public class AccessLog {
 
     private boolean successful;
 
-    // nullable = true, weil der Batch-Import keinen Link hat
+    // Optional: Nur gesetzt bei Zugriffen über Share-Links.
+    // Beim Batch-Import bleibt dies null.
     @ManyToOne
     @JoinColumn(name = "share_link_id", nullable = true)
     private ShareLink shareLink;
 
-    @Column(name = "document_id")
+    // Zusatzfelder für Sprint 7 (Batch Import aus XML)
+    // Speichert die externe ID aus der XML-Datei.
+    @Column(name = "document_id_ref")
     private Long documentId;
 
     @Column(name = "log_message")

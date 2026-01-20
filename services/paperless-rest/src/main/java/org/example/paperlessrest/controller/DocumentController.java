@@ -1,13 +1,11 @@
 package org.example.paperlessrest.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.paperlessrest.dto.DocumentRequestDto;
 import org.example.paperlessrest.dto.DocumentResponseDto;
-import org.example.paperlessrest.mapper.DocumentMapper;
-import org.example.paperlessrest.repository.DocumentRepository;
-import org.example.paperlessrest.repository.ElasticSearchRepository;
 import org.example.paperlessrest.search.ElasticDocument;
 import org.example.paperlessrest.service.DocumentService;
 import org.springframework.http.HttpStatus;
@@ -19,66 +17,56 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * REST-Controller für die Dokumentenverwaltung.
+ * Bildet die Schnittstelle zum Frontend (Angular) und delegiert
+ * die Geschäftslogik an den {@link DocumentService}.
+ */
 @RestController
 @RequestMapping("/api/documents")
-@CrossOrigin(origins = "http://localhost:4200")
 @Slf4j
-@Tag(name = "Document Controller", description = "Endpoints for managing documents")
+@RequiredArgsConstructor
+@Tag(name = "Document Controller", description = "API für Upload, Suche und Verwaltung von Dokumenten")
 public class DocumentController {
 
     private final DocumentService documentService;
-    private final ElasticSearchRepository elasticRepository;
-    private final DocumentMapper documentMapper;
-    private final DocumentRepository documentRepository;
 
-    public DocumentController(DocumentService documentService,
-                              ElasticSearchRepository elasticRepository,
-                              DocumentMapper documentMapper,
-                              DocumentRepository documentRepository) {
-        this.documentService = documentService;
-        this.elasticRepository = elasticRepository;
-        this.documentMapper = documentMapper;
-        this.documentRepository = documentRepository;
-    }
-
-    @Operation(summary = "Upload a document", description = "Uploads a PDF file and triggers OCR processing.")
+    @Operation(summary = "Dokument hochladen", description = "Nimmt ein PDF entgegen, speichert es im Object-Storage und startet den asynchronen OCR-Prozess.")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> uploadDocument(
+    @ApiResponse(responseCode = "201", description = "Dokument erfolgreich hochgeladen.")
+    public ResponseEntity<Void> uploadDocument(
             @RequestPart("file") MultipartFile file,
             @RequestParam(value = "title", required = false) String title
     ) {
         try {
-            DocumentRequestDto dto = new DocumentRequestDto();
-            dto.setTitle(title != null ? title : file.getOriginalFilename());
-            dto.setCategory("Uncategorized");
-
-            log.info("Uploading document: {}", dto.getTitle());
-
-            documentService.uploadAndDispatch(file);
-
+            log.info("REST Request: Upload Dokument '{}'", file.getOriginalFilename());
+            documentService.uploadAndDispatch(file, title);
             return ResponseEntity.status(HttpStatus.CREATED).build();
         } catch (Exception e) {
-            log.error("Upload failed", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+            log.error("Fehler beim Upload des Dokuments", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
-    @Operation(summary = "Search documents", description = "Performs a fuzzy search on content and title via ElasticSearch.")
-    @GetMapping("/search")
-    public ResponseEntity<List<ElasticDocument>> searchDocuments(@RequestParam("query") String query) {
-        log.info("Searching for: {}", query);
-        List<ElasticDocument> results = elasticRepository.fuzzySearch(query);
-        return ResponseEntity.ok(results);
+    @Operation(summary = "Alle Dokumente laden", description = "Liefert eine Liste aller persistierten Dokumente.")
+    @GetMapping
+    public ResponseEntity<List<DocumentResponseDto>> getAllDocuments() {
+        log.info("REST Request: Alle Dokumente abrufen");
+        return ResponseEntity.ok(documentService.getAllDocuments());
     }
 
-    //Mapstruct
-    @Operation(summary = "Get document by ID", description = "Returns document details as DTO using MapStruct conversion.")
+    @Operation(summary = "Dokument suchen", description = "Volltextsuche über ElasticSearch (Titel & Inhalt).")
+    @GetMapping("/search")
+    public ResponseEntity<List<ElasticDocument>> searchDocuments(@RequestParam("query") String query) {
+        log.info("REST Request: Suche nach '{}'", query);
+        return ResponseEntity.ok(documentService.searchDocuments(query));
+    }
+
+    @Operation(summary = "Dokumentdetails laden", description = "Liefert Metadaten und OCR-Text eines spezifischen Dokuments.")
     @GetMapping("/{id}")
     public ResponseEntity<DocumentResponseDto> getDocument(@PathVariable UUID id) {
-        log.info("Fetching document with ID: {}", id);
-        return documentRepository.findById(id)
-                //Entity -> DTO via MapStruct
-                .map(documentMapper::entityToDto)
+        log.info("REST Request: Dokument Details für ID {}", id);
+        return documentService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

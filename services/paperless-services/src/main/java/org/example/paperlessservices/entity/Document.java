@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.util.UUID;
 
+/**
+ * Entität für Dokumente (Spiegelbild zur REST-Service Entität).
+ * Enthält Metadaten und die Ergebnisse der Worker (OCR, Summary).
+ */
 @Entity
 @Data
 @NoArgsConstructor
@@ -24,9 +28,11 @@ public class Document {
 
     private String status;
 
-    @Column(length = 10000)
+    @Column(columnDefinition = "TEXT")
+    @ToString.Exclude // Verhindert riesige Logs
     private String ocrText;
 
     @Column(length = 4096)
+    @ToString.Exclude
     private String summary;
 }

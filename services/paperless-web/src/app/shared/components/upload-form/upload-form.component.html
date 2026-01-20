@@ -1,0 +1,30 @@
+<div class="text-center">
+  <div class="mb-3">
+    <label for="fileInput" class="form-label text-muted small">PDF auswählen</label>
+    <div class="input-group">
+      <input type="file"
+             class="form-control"
+             id="fileInput"
+             (change)="onFileSelected($event)"
+             accept=".pdf"
+             [disabled]="isLoading">
+    </div>
+  </div>
+
+  <div class="d-grid">
+    <button class="btn btn-primary"
+            (click)="uploadFile()"
+            [disabled]="!selectedFile || isLoading">
+      <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      {{ isLoading ? 'Wird hochgeladen...' : 'Hochladen starten' }}
+    </button>
+  </div>
+
+  <div *ngIf="successMsg" class="alert alert-success mt-3 py-2 small mb-0 d-flex align-items-center">
+    <i class="bi bi-check-circle-fill me-2"></i> {{ successMsg }}
+  </div>
+
+  <div *ngIf="errorMsg" class="alert alert-danger mt-3 py-2 small mb-0 d-flex align-items-center">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ errorMsg }}
+  </div>
+</div>

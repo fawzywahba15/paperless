@@ -1,10 +1,11 @@
 package org.example.paperlessrest.controller;
 
-import io.minio.GetObjectArgs;
-import io.minio.MinioClient;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.paperlessrest.entity.Document;
 import org.example.paperlessrest.service.ShareService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,58 +15,59 @@ import org.springframework.web.bind.annotation.*;
 import java.io.InputStream;
 import java.util.UUID;
 
+/**
+ * Controller für das Teilen von Dokumenten.
+ * Erlaubt das Erstellen von temporären Links und den Download darüber.
+ */
 @RestController
 @RequestMapping("/api/share")
-@CrossOrigin(origins = "http://localhost:4200")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(name = "Share Controller", description = "Verwaltung von temporären Freigabe-Links")
 public class ShareController {
 
     private final ShareService shareService;
-    private final MinioClient minioClient;
 
-    @Value("${minio.bucket}")
-    private String bucketName;
-
-    public ShareController(ShareService shareService, MinioClient minioClient) {
-        this.shareService = shareService;
-        this.minioClient = minioClient;
-    }
-
-    // 1. Link erstellen (POST)
+    @Operation(summary = "Share-Link erstellen", description = "Erstellt einen zeitlich begrenzten Link für ein Dokument.")
     @PostMapping("/{id}")
     public ResponseEntity<String> createShareLink(@PathVariable UUID id) {
+        log.info("Erstelle Share-Link für Dokument ID: {}", id);
         String token = shareService.createShareLink(id);
-        // geben die volle URL zurück
-        return ResponseEntity.ok("http://localhost:8081/api/share/download/" + token);
+
+        // Wir geben die URL zurück, die der User aufrufen kann
+        // HINWEIS: In Production sollte hier die echte Domain stehen, nicht localhost
+        String shareUrl = "http://localhost:8081/api/share/download/" + token;
+        return ResponseEntity.ok(shareUrl);
     }
 
-    // 2. Datei herunterladen (GET - Öffentlich via Token)
+    @Operation(summary = "Dokument herunterladen", description = "Lädt ein Dokument über einen gültigen Share-Token herunter (öffentlicher Zugriff).")
     @GetMapping("/download/{token}")
     public ResponseEntity<InputStreamResource> downloadViaToken(@PathVariable String token) {
         try {
-            // Token prüfen und Dokument holen (Tracking passiert im Service)
+            log.info("Download-Anfrage mit Token: {}", token);
+
+            // 1. Dokument validieren & Loggen
             Document doc = shareService.getDocumentByToken(token);
 
-            // Datei aus MinIO streamen
-            InputStream stream = minioClient.getObject(
-                    GetObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(doc.getObjectKey()) // Pfad zur Datei im Bucket
-                            .build()
-            );
+            // 2. Stream holen (Logik jetzt im Service)
+            InputStream stream = shareService.getFileStream(doc);
 
-            String downloadName;
+            // 3. Dateinamen bereinigen (verhindert "file.pdf.pdf")
+            String downloadName = doc.getFilename();
             if (doc.getTitle() != null && !doc.getTitle().isEmpty()) {
-                downloadName = doc.getTitle() + ".pdf";
-            } else {
-                downloadName = doc.getFilename(); // Nimmt den Original-Namen (z.B. "file.pdf")
+                downloadName = doc.getTitle();
+                if (!downloadName.toLowerCase().endsWith(".pdf")) {
+                    downloadName += ".pdf";
+                }
             }
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + ".pdf\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadName + "\"")
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(new InputStreamResource(stream));
 
         } catch (Exception e) {
+            log.error("Fehler beim Download via Token: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }

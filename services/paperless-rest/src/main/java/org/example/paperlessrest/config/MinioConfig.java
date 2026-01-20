@@ -9,19 +9,35 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Konfiguration für den S3-kompatiblen Object Storage (MinIO).
+ */
 @Configuration
 public class MinioConfig {
 
-    @Value("${minio.endpoint}") private String endpoint;
-    @Value("${minio.access}")   private String access;
-    @Value("${minio.secret}")   private String secret;
-    @Value("${minio.bucket}")   private String bucket;
+    @Value("${minio.endpoint}")
+    private String endpoint;
+
+    @Value("${minio.access}")
+    private String access;
+
+    @Value("${minio.secret}")
+    private String secret;
+
+    @Value("${minio.bucket}")
+    private String bucket;
 
     @Bean
     public MinioClient minioClient() {
-        return MinioClient.builder().endpoint(endpoint).credentials(access, secret).build();
+        return MinioClient.builder()
+                .endpoint(endpoint)
+                .credentials(access, secret)
+                .build();
     }
 
+    /**
+     * Erstellt den Bucket beim Start automatisch, falls er noch nicht existiert.
+     */
     @Bean
     @ConditionalOnProperty(name = "minio.autocreate", havingValue = "true", matchIfMissing = true)
     public CommandLineRunner createBucketIfMissing(MinioClient client) {
@@ -33,4 +49,3 @@ public class MinioConfig {
         };
     }
 }
-

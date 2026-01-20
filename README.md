@@ -234,3 +234,19 @@ paperless/
 * Führen Sie docker-compose down -v aus, um die Volumes zu löschen und mit einer frischen DB zu starten.
 
 ---
+
+## Integrationstests (End-to-End)
+
+Um die vollständige Funktionskette (Upload -> Queue -> OCR -> AI -> Search) zu testen, wurde ein E2E Test implementiert.
+
+**Voraussetzungen:**
+1. Das System muss laufen: `docker-compose up -d --build`
+2. Alle Container (REST, Service, DB, Broker, Elastic, MinIO) müssen "healthy" sein.
+
+**Ausführung:**
+Der Test ist als JUnit Test im `paperless-rest` Modul implementiert.
+Befehl:
+```bash
+# Im root ordner
+cd services/paperless-rest
+mvn test -Dtest=EndToEndIntegrationTest

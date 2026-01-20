@@ -7,6 +7,10 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * Root-DTO für den Import von XML-Dateien (Access Logs).
+ * Mappt das XML-Wurzelelement <AccessLogs>.
+ */
 @Data
 @JacksonXmlRootElement(localName = "AccessLogs")
 public class XmlAccessLogs {

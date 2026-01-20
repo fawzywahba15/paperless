@@ -1,13 +1,13 @@
 import { Component, EventEmitter, Output } from '@angular/core';
-import { DocumentService } from '../../../Core/services/document.service';
 import { CommonModule } from '@angular/common';
+import { DocumentService } from '../../../core/services/document.service';
 
 @Component({
   selector: 'app-upload-form',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './upload-form-component.html',
-  styleUrls: ['./upload-form-component.css']
+  templateUrl: './upload-form.component.html',
+  styleUrl: './upload-form.component.css'
 })
 export class UploadFormComponent {
   selectedFile?: File;
@@ -22,7 +22,16 @@ export class UploadFormComponent {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files?.length) {
-      this.selectedFile = input.files[0];
+      const file = input.files[0];
+
+      if (file.type !== 'application/pdf') {
+        this.errorMsg = 'Nur PDF-Dateien sind erlaubt!';
+        this.selectedFile = undefined;
+        input.value = ''; // Reset Input
+        return;
+      }
+
+      this.selectedFile = file;
       this.errorMsg = '';
       this.successMsg = '';
     }
@@ -36,21 +45,20 @@ export class UploadFormComponent {
     this.successMsg = '';
 
     this.documentService.uploadDocument(this.selectedFile).subscribe({
-      next: (res) => {
-        console.log('Upload success:', res);
+      next: () => {
         this.isLoading = false;
-        this.successMsg = 'Upload erfolgreich! Verarbeitung läuft...';
-
-        // Datei-Auswahl leeren
+        this.successMsg = 'Upload erfolgreich!';
         this.selectedFile = undefined;
 
-        // Parent benachrichtigen
+        const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+        if(fileInput) fileInput.value = '';
+
         this.uploadSuccess.emit();
       },
-      error: (err) => {
-        console.error('Upload error:', err);
+      error: (err: any) => {
+        console.error(err);
         this.isLoading = false;
-        this.errorMsg = 'Upload fehlgeschlagen: ' + (err.message || 'Server Error');
+        this.errorMsg = 'Upload fehlgeschlagen.';
       }
     });
   }

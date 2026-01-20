@@ -1,10 +1,6 @@
 package org.example.paperlessrest.controller;
 
 import org.example.paperlessrest.dto.DocumentResponseDto;
-import org.example.paperlessrest.entity.Document;
-import org.example.paperlessrest.mapper.DocumentMapper;
-import org.example.paperlessrest.repository.DocumentRepository;
-import org.example.paperlessrest.repository.ElasticSearchRepository;
 import org.example.paperlessrest.search.ElasticDocument;
 import org.example.paperlessrest.service.DocumentService;
 import org.junit.jupiter.api.Test;
@@ -13,21 +9,26 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.doThrow;
+
 
 @WebMvcTest(DocumentController.class)
-class DocumentControllerTest {
+@ActiveProfiles("test")
+public class DocumentControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -35,54 +36,81 @@ class DocumentControllerTest {
     @MockBean
     private DocumentService documentService;
 
-    @MockBean
-    private ElasticSearchRepository elasticRepository;
-
-    @MockBean
-    private DocumentMapper documentMapper;
-
-    @MockBean
-    private DocumentRepository documentRepository;
-
     @Test
-    void upload_ShouldReturn201_WhenUploadSucceeds() throws Exception {
+    void uploadDocument_ShouldReturn201() throws Exception {
+        // GIVEN
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.pdf", MediaType.APPLICATION_PDF_VALUE, "Content".getBytes()
-        );
+                "file", "invoice.pdf", "application/pdf", "Dummy Content".getBytes());
 
-        when(documentService.uploadAndDispatch(any())).thenReturn(null);
-
+        // WHEN & THEN
         mockMvc.perform(multipart("/api/documents")
-                        .file(file))
-                .andExpect(status().isCreated());
+                        .file(file)
+                        .param("title", "Rechnung"))
+                .andExpect(status().isCreated()); // Wichtig: Controller liefert 201
+
+        verify(documentService).uploadAndDispatch(any(), eq("Rechnung"));
     }
 
     @Test
-    void search_ShouldReturnList() throws Exception {
-        // Mock Elastic
-        ElasticDocument hit = new ElasticDocument("1", "Title", "Content");
-        when(elasticRepository.fuzzySearch("query")).thenReturn(List.of(hit));
+    void getAllDocuments_ShouldReturn200() throws Exception {
+        // GIVEN
+        given(documentService.getAllDocuments()).willReturn(Collections.emptyList());
 
-        mockMvc.perform(get("/api/documents/search").param("query", "query"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value("1"));
+        // WHEN & THEN
+        mockMvc.perform(get("/api/documents"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getDocument_ShouldReturnDto_WhenFound() throws Exception {
+    void searchDocuments_ShouldReturn200() throws Exception {
+        // GIVEN
+        given(documentService.searchDocuments("test")).willReturn(Collections.emptyList());
+
+        // WHEN & THEN
+        mockMvc.perform(get("/api/documents/search")
+                        .param("query", "test"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getDocument_ShouldReturn200_WhenFound() throws Exception {
+        // GIVEN
         UUID id = UUID.randomUUID();
-        Document doc = new Document();
-        doc.setId(id);
-        doc.setFilename("test.pdf");
+        DocumentResponseDto dto = new DocumentResponseDto(
+                id, "Title", "Cat", "Sum", "file.pdf", "application/pdf", 100L, "COMPLETED", "OCR"
+        );
+        given(documentService.findById(id)).willReturn(Optional.of(dto));
 
-        DocumentResponseDto dto = new DocumentResponseDto(id, "test.pdf", "application/pdf", 100L, "COMPLETED");
-
-        // Mock Repository & Mapper
-        when(documentRepository.findById(id)).thenReturn(Optional.of(doc));
-        when(documentMapper.entityToDto(doc)).thenReturn(dto);
-
+        // WHEN & THEN
         mockMvc.perform(get("/api/documents/" + id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.filename").value("test.pdf"));
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getDocument_ShouldReturn404_WhenNotFound() throws Exception {
+        // GIVEN
+        UUID id = UUID.randomUUID();
+        given(documentService.findById(id)).willReturn(Optional.empty());
+
+        // WHEN & THEN
+        mockMvc.perform(get("/api/documents/" + id))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void uploadDocument_ShouldReturn500_WhenServiceFails() throws Exception {
+        // GIVEN
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "error.pdf", "application/pdf", "Content".getBytes());
+
+        // Wir simulieren eine Exception im Service
+        doThrow(new RuntimeException("MinIO Error"))
+                .when(documentService).uploadAndDispatch(any(), any());
+
+        // WHEN & THEN
+        mockMvc.perform(multipart("/api/documents")
+                        .file(file)
+                        .param("title", "Error Title"))
+                .andExpect(status().isInternalServerError()); // Erwartet 500
     }
 }
