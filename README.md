@@ -1,252 +1,227 @@
-# Paperless - Verteiltes Dokumentenmanagementsystem
+# 📄 Paperless – Verteiltes Dokumentenmanagementsystem
 
-Ein modernes, Microservice-basiertes System zur Archivierung, Verarbeitung und Suche von Dokumenten. Entwickelt im Rahmen des Semesterprojekts (Sprints 1-7).
+Ein modernes, **Microservice-basiertes System** zur Archivierung, Verarbeitung und Suche von Dokumenten.  
+Entwickelt im Rahmen des **Semesterprojekts (SWEN3 / BIF5)**.
 
-Das System ermöglicht den Upload von PDFs, extrahiert Text mittels OCR (Tesseract), generiert KI-Zusammenfassungen (Google Gemini), speichert Daten relational (PostgreSQL) sowie als Objekte (MinIO) und ermöglicht eine performante Volltextsuche (ElasticSearch). Zusätzlich werden externe Zugriffsdaten über einen automatisierten Batch-Prozess importiert.
-
----
-
-## 🚀 Features & Highlights
-
-Das Projekt deckt alle Anforderungen der Sprints 1 bis 7 ab:
-
-* **📄 Dokumenten-Upload:**
-    * Upload via Web-UI (Angular) oder REST API.
-    * Speicherung der Originaldatei in **MinIO** (S3-kompatibler Object Storage).
-    * Speicherung der Metadaten in **PostgreSQL**.
-* **🔄 Automatisierter Batch-Import:**
-    * Überwachung des Dateisystems (scan_input) auf neue XML-Zugriffslogs.
-    * Automatischer Import in die Datenbank und Archivierung der verarbeiteten Dateien.
-    * Konfigurierbare Pfade und Zeitplanung (Scheduling).
-* **⚙️ Asynchrone Verarbeitung (Messaging):**
-    * Nutzung von **RabbitMQ** zur Entkopplung von Upload und Verarbeitung.
-    * Skalierbare Worker-Architektur.
-* **🔍 OCR & Texterkennung:**
-    * Automatisierte Textextraktion mit **Tesseract OCR**.
-* **🤖 KI-Integration (GenAI):**
-    * Automatische Zusammenfassung des Dokumenteninhalts mittels **Google Gemini API**.
-* **🔎 Intelligente Suche (ElasticSearch):**
-    * Indizierung aller Dokumenteninhalte.
-    * Fuzzy-Search (unscharfe Suche) über Titel und OCR-Content.
-* **🔗 Secure Document Sharing (Additional Use-Case):**
-    * Erstellen von zeitlich begrenzten Share-Links.
-    * Tracking von Zugriffen (Access Logs) in der Datenbank.
-* **📚 API Dokumentation:**
-    * Vollständige OpenAPI/Swagger Spezifikation integriert.
+Das System deckt den vollständigen Lebenszyklus eines Dokuments ab:  
+Vom Upload über die **asynchrone OCR- und KI-Analyse** bis hin zur **Archivierung und Volltextsuche**.  
+Zusätzlich integriert es externe Systeme über einen **Batch-Import**.
 
 ---
 
-## 🛠️ Technologie-Stack
+## 🚀 Features & Highlights (Sprint 1–7)
 
-### Backend
-* **Framework:** Spring Boot 3 (Java 21)
-* **Kommunikation:** REST, AMQP (RabbitMQ)
-* **Datenbank:** PostgreSQL 16 (Hibernate/JPA)
-* **Search Engine:** ElasticSearch 8
-* **Object Storage:** MinIO
-* **Tools:** Lombok, MapStruct (Entity-DTO Mapping), Jackson (XML/JSON), Maven
+Das Projekt erfüllt alle funktionalen und nicht-funktionalen Anforderungen:
 
-### Frontend
-* **Framework:** Angular 18 (Standalone Components)
-* **Styling:** Custom CSS, Responsive Layout
-* **Server:** Nginx (als Reverse Proxy und Webserver)
+### 📄 Dokumenten-Upload & Management
+- Upload via **Web-UI (Angular)** oder **REST API**
+- Sichere Speicherung der Originaldatei in **MinIO (S3)**
+- Metadaten-Verwaltung in **PostgreSQL**
 
-### Infrastruktur
-* **Containerisierung:** Docker & Docker Compose
-* **Orchestrierung:** Alle Services starten mit einem Befehl.
+### 🔍 OCR & Texterkennung
+- Automatische Textextraktion mittels **Tesseract OCR**
+- Asynchrone Verarbeitung im Worker-Service
+
+### 🤖 KI-Integration (GenAI)
+- Automatische Inhaltsanalyse und Zusammenfassung durch **Google Gemini AI**
+
+### 🔎 Intelligente Suche (ElasticSearch)
+- Echtzeit-Indizierung aller Dokumenteninhalte
+- **Fuzzy-Search** über OCR-Text und Titel
+
+### 🔗 Secure Sharing (Additional Use Case)
+- Generierung temporärer Download-Links
+- **Audit-Logging** aller Zugriffe (Tracking in DB)
+
+### 🔄 Batch-Import (Sprint 7)
+- Automatisierter Import von **XML-Access-Logs** aus einem überwachten Ordner
+- Scheduling, Verarbeitung und Archivierung der Quelldateien
 
 ---
 
+---
+
+## 🛠️ Technologie-Stack & Architektur
+
+Die Anwendung folgt einer strikten **Hexagonalen Architektur** mit Microservices.
+
+| Layer | Technologie | Details |
+| :--- | :--- | :--- |
+| **Frontend** | **Angular 20** | Standalone Components, Bootstrap 5, Responsive UI |
+| **API Gateway** | **Nginx** | Reverse Proxy für Frontend und Backend |
+| **Backend API** | **Spring Boot 3.3** | REST-Schnittstelle, Validierung, Business Logic |
+| **Worker Service** | **Spring Boot 3.3** | Asynchrone Verarbeitung (OCR, AI, Indexing), Batch Jobs |
+| **Messaging** | **RabbitMQ** | Entkopplung von API & Worker (Queues: `ocr`, `genai`) |
+| **Database** | **PostgreSQL 16** | Relationale Datenhaltung (JPA / Hibernate) |
+| **Search Engine** | **ElasticSearch 8** | Volltext-Suchindex |
+| **Storage** | **MinIO** | S3-kompatibler Object Storage für PDFs |
+
+```mermaid
+graph TD
+    User[User / Browser] -->|HTTP| Nginx[Nginx / Webserver]
+    Nginx -->|Serve| Angular[Angular Frontend]
+    Nginx -->|Proxy API| REST[Spring Boot REST API]
+    
+    subgraph "Data Layer"
+        REST -->|Persist Meta| DB[(PostgreSQL)]
+        REST -->|Store File| MinIO[(MinIO Object Storage)]
+    end
+    
+    REST -->|Publish Msg| Rabbit[RabbitMQ]
+    
+    subgraph "Async Worker"
+        Worker[Spring Boot Worker Service] -->|Consume Msg| Rabbit
+        Worker -->|Fetch File| MinIO
+        Worker -->|OCR| Tesseract[Tesseract OCR]
+        Worker -->|Analyze| GenAI[Google Gemini API]
+        Worker -->|Index| Elastic[ElasticSearch]
+        Worker -->|Save Result| DB
+    end
+```
+
+---
+
+## 👩‍💻 Entwicklungsprozess & Workflow
+
+Um die Qualität und Stabilität des Codes zu gewährleisten, wurde folgender Workflow etabliert (gemäß Rating-Matrix):
+
+- **Version Control (GitFlow):**  
+  Nutzung von Feature-Branches (z. B. `feat/sprint7`, `feat/ocr`) und Pull Requests für Code-Reviews vor dem Merge in den `main`-Branch.
+
+- **Issue Tracking:**  
+  Verwaltung der Sprints und Tasks über **GitHub Issues / Projects** (Kanban-Board).
+
+- **Qualitätssicherung:**  
+  Manuelle Ausführung von **Unit-Tests** und **Docker-Builds** vor jedem Commit zur Sicherung der Stabilität.
+
+---
 ## 🏃‍♂️ Installation & Start
 
 ### Voraussetzungen
-* Docker & Docker Desktop installiert.
-* Git installiert.
-* (Optional) Java 21 JDK & Maven für lokale Entwicklung.
-
-### Starten der Anwendung
-Das gesamte System wird über Docker Compose gestartet. Es ist keine lokale Installation von Datenbanken oder Java notwendig.
-
----
-1.  **Repository klonen:**
-    ```bash
-    git clone https://github.com/fawzywahba15/paperless
-    cd paperless
-    ```
----
-2. **API Key Konfiguration**
-
-Aus Sicherheitsgründen ist der echte API-Key nicht im Repository enthalten. Damit die KI-Funktionen (Document Summarization) funktionieren, ist eine lokale Konfiguration nötig:
-
-1. Öffnen Sie die Datei `.env.sample` im Hauptverzeichnis.
-2. Suchen Sie die Variable `GEMINI_API_KEY`.
-3.  Ersetzen Sie den Platzhalter durch Ihren echten Google Gemini API Key:
-
-    ```env
-    GEMINI_API_KEY="YourKey"
-    ```
----
-3. **System bauen und starten:**
-    Dieser Befehl baut die Java-JARs, die Angular-App und erstellt die Docker-Images.
-    ```bash
-    docker-compose up --build
-    ```
-    *(Der erste Start kann einige Minuten dauern, da Maven-Abhängigkeiten und Docker-Images geladen werden.)*
----
-4. **Warten auf Bereitschaft:**
-    Warten Sie, bis in den Logs `Started PaperlessRestApplication` und `Started PaperlessServiceApplication` erscheint.
+- **Docker & Docker Desktop** installiert
+- *(Optional)* Google Gemini API Key für KI-Features
 
 ---
 
-## 🖥️ Nutzung & Zugriff
+### 1. Konfiguration (API Key)
 
-Nach dem erfolgreichen Start sind folgende Dienste erreichbar:
+Erstellen Sie eine Datei `.env` im Hauptverzeichnis  
+(Kopie von `.env.sample`) und tragen Sie Ihren Key ein:
 
-| Dienst | URL | Beschreibung |
-| :--- | :--- | :--- |
-| **Web UI** | [http://localhost:8080](http://localhost:8080) | Die Hauptanwendung für Benutzer. |
-| **API Docs** | [http://localhost:8081/swagger-ui/index.html](http://localhost:8081/swagger-ui/index.html) | Swagger UI zum Testen der Endpunkte. |
-| **MinIO** | [http://localhost:9090](http://localhost:9090) | S3 Konsole. |
-| **RabbitMQ** | [http://localhost:9093](http://localhost:9093) | Messaging Dashboard. |
-| **Adminer** | [http://localhost:9091](http://localhost:9091) | Datenbank-Verwaltung. |
-### 🔑 Standard-Zugangsdaten
-
-Damit Sie sich direkt in die Verwaltungsoberflächen einloggen können:
-
-| Dienst | Benutzer / Login | Passwort | Zusatzinfo |
-| :--- | :--- | :--- | :--- |
-| **Adminer (DB)** | `paperless` | `paperless` | System: **PostgreSQL**, DB: `paperless` |
-| **MinIO** | `minioadmin` | `minioadmin` | |
-| **RabbitMQ** | `guest` | `guest` | |
+```properties
+GEMINI_API_KEY=Ihre_Google_Gemini_API_Key_Hier
+```
+- Hinweis:
+Ohne API Key funktioniert das System vollständig,
+lediglich die KI-Zusammenfassung wird übersprungen.
 
 ---
 
-### Workflow 1: Dokumenten-Upload, KI (Der "Happy Path")
+### 2. Starten
 
-1.  Öffnen Sie das **Web UI** (`http://localhost:8080`).
-2.  Laden Sie ein PDF-Dokument über das Upload-Formular hoch.
-3.  **Warten:** Im Hintergrund passiert folgendes:
-    * REST-API speichert Datei in MinIO & DB.
-    * RabbitMQ Nachricht -> OCR Worker extrahiert Text.
-    * GenAI Worker -> Erstellt Zusammenfassung.
-    * Indexer -> Speichert Text in ElasticSearch.
-4.  Nutzen Sie die **Suchleiste**: Suchen Sie nach einem Wort, das im PDF vorkommt (z.B. "Rechnung", "Wien"). Das Dokument sollte erscheinen.
-
----
-
-### Workflow 2: Batch-Import testen
-
-Der Batch-Service überwacht Ordner auf XML-Dateien, um externe Access-Logs zu importieren.
-
-1.  Navigieren Sie im Projektordner zu ./scan_input.
-2.  Kopieren Sie die bereitgestellte Beispieldatei sample_access_log.xml in diesen Ordner.
-
-Hinweis: Der Scheduler läuft zu Demo-Zwecken alle 30 Sekunden (Produktionseinstellung für 01:00 Uhr ist im Code dokumentiert).
-3.  Warten Sie ca. 30 Sekunden.
-4.  Ergebnis prüfen:
-
-Die Datei wurde automatisch in den Ordner ./scan_archive verschoben (und umbenannt).
-
-In der Datenbank (Tabelle access_log) sind neue Einträge sichtbar (via Adminer).
-
----
-
-### Workflow 3: Document Sharing
-
-1.  Klicken Sie im UI auf den "Share" Button bei einem Dokument.
-2.  Ein Link wird generiert. Beim Aufruf wird das Dokument heruntergeladen.
-3.  Dieser Zugriff wird in der Datenbank protokolliert.
-
----
-
-## ✅ Qualitätssicherung & Tests
-
-Das Projekt verfügt über eine umfassende Test-Suite, die kritische Pfade und Business-Logik absichert (Code Coverage > 70%).
-
-### 1. Integration Tests (REST API)
-Für den Use-Case "Document Upload" wurde ein robuster Integrationstest implementiert:
-
-* **Strategie:** Verwendung von `@WebMvcTest` (Slice Testing).
-* **Ablauf:** Der Test prüft den Controller-Layer, das JSON-Mapping und die HTTP-Statuscodes. Externe Abhängigkeiten (DB, MinIO, ElasticSearch) werden gemockt, um Stabilität in der CI/CD-Pipeline (Docker Build) zu garantieren, ohne auf schwere
-* **Ausführung:** Erfolgt automatisch bei jedem `docker-compose build`.
-
-### 2. Unit Tests
-
-* **Worker Services:** Validierung der Business-Logik für OCR und GenAI-Verarbeitung.
-* **Mapping** Tests für Entity-DTO Konvertierungen.
+Führen Sie im Hauptverzeichnis folgenden Befehl aus:
 
 ```bash
-# REST Tests
-cd services/paperless-rest
-./mvnw test
-
-# Service/Worker Tests
-cd services/paperless-services
-./mvnw test
-```
-
----
-
-## 🧪 Additional Use-Case: Document Sharing
-
-Dieser Use-Case demonstriert die Erweiterung des Datenmodells und der Business-Logik.
-
-* **Funktion:** Benutzer können Dokumente temporär freigeben.
-* **Neue Entities:**
-    * `ShareLink`: Speichert Token und Ablaufdatum.
-    * `AccessLog`: Protokolliert jeden Download-Versuch (Erfolg/Fehler, Zeitstempel).
-* **Testen:**
-    1.  Klicken Sie im UI auf den blauen "Share" Button bei einem Dokument.
-    2.  Ein Link wird generiert (z.B. `http://localhost:8081/api/share/download/xyz123`).
-    3.  Beim Aufruf dieses Links wird das Dokument direkt heruntergeladen.
-    4.  Prüfung: In der Datenbank-Tabelle `access_log` ist nun ein Eintrag sichtbar.
-
----
-
-## 📂 Projektstruktur
-
-```plaintext
-paperless/
-├── compose/                # Configs (DB, Nginx, ElasticSearch)
-├── scan_input/             # Watch-Folder für Batch Import
-├── scan_archive/           # Archiv für verarbeitete Batch-Dateien
-├── services/
-│   ├── paperless-rest/     # Backend API (Spring Boot)
-│   ├── paperless-services/ # Worker Service (OCR, Batch, GenAI)
-│   └── paperless-web/      # Frontend (Angular)
-├── docker-compose.yml      # Orchestrierung
-├── sample_access_log.xml   # Testdatei für Batch Import
-└── README.md               # Dokumentation
+docker-compose up -d --build
 
 ```
 
----
-
-## ⚠️ Troubleshooting
-
-1. Upload hängt?
-* Prüfen Sie die Logs (docker-compose logs -f paperless-service), ob Tesseract OCR läuft.
-
-2. Suche findet nichts?
-* Warten Sie einige Sekunden nach dem Upload (ElasticSearch Indexierung ist asynchron).
-
-3. Datenbank-Fehler?
-* Führen Sie docker-compose down -v aus, um die Volumes zu löschen und mit einer frischen DB zu starten.
+- Bitte warten Sie ca. 60 Sekunden, bis alle Container
+(insbesondere ElasticSearch) den Status "healthy" melden.
 
 ---
 
-## Integrationstests (End-to-End)
+## 🖥️ Nutzung & Zugangsdaten
 
-Um die vollständige Funktionskette (Upload -> Queue -> OCR -> AI -> Search) zu testen, wurde ein E2E Test implementiert.
+### Web Interfaces
+
+| Dienst        | URL                       | Login                   | Beschreibung                         |
+|---------------|---------------------------|-------------------------|--------------------------------------|
+| Paperless UI  | http://localhost:8080     | –                       | Hauptanwendung                       |
+| API Docs      | http://localhost:8081/api | –                       | Backend-Endpunkte                    |
+| DB Adminer    | http://localhost:9091     | paperless / paperless   | Server: postgres, DB: paperless      |
+| MinIO         | http://localhost:9090     | minioadmin / minioadmin | Dateispeicher                        |
+| RabbitMQ      | http://localhost:9093     | guest / guest           | Message Broker                       |
+
+---
+
+## 🧪 Testing & Verifikation
+
+### 1. E2E Integrationstest (Sprint 7 HOWTO)
+Der `EndToEndIntegrationTest` überprüft den gesamten Workflow (Upload → Asynchrone Verarbeitung → Suche) gegen die laufende Docker-Umgebung.
+
+**Wichtig:** Da dies ein Systemtest ist, müssen die Container laufen!
+
+* **Technologie:** JUnit 5, RestAssured.
+* **Strategie:** Black-Box-Test gegen die Docker-Infrastruktur (Integration Level).
 
 **Voraussetzungen:**
-1. Das System muss laufen: `docker-compose up -d --build`
-2. Alle Container (REST, Service, DB, Broker, Elastic, MinIO) müssen "healthy" sein.
+1.  Starten Sie das System: `docker-compose up -d --build`
+2.  Warten Sie, bis alle Services (insb. ElasticSearch & MinIO) "healthy" sind.
+3.  Stellen Sie sicher, dass eine Test-PDF existiert:
+    * Pfad: `services/paperless-rest/src/test/resources/integration-test.pdf`
+    * *(Falls nicht vorhanden, legen Sie dort eine beliebige kleine PDF-Datei ab)*.
+
+**Test-Szenario:**
+1.  **Upload:** Sendet das PDF an die REST-API.
+2.  **Verarbeitung:** Wartet (Polling bis zu 120s), bis der Status `COMPLETED` ist und eine KI-Zusammenfassung existiert.
+3.  **Suche:** Prüft, ob das Dokument via ElasticSearch gefunden wird.
 
 **Ausführung:**
-Der Test ist als JUnit Test im `paperless-rest` Modul implementiert.
-Befehl:
+Navigieren Sie in das Backend-Verzeichnis und starten Sie den Test:
+
 ```bash
-# Im root ordner
 cd services/paperless-rest
 mvn test -Dtest=EndToEndIntegrationTest
+```
+
+---
+
+### 2. Batch-Import testen (Sprint 7)
+
+- Der Batch-Service importiert XML-Dateien aus dem Ordner `scan_input`.
+
+- Kopieren Sie die Datei `sample_access_log.xml` in den Ordner:
+
+```bash
+# Windows
+Copy-Item sample_access_log.xml -Destination scan_input/
+
+# Mac / Linux
+cp sample_access_log.xml scan_input/
+```
+
+Der Batch-Import ist als Scheduled Task implementiert. Zu Demo-Zwecken läuft er alle 30 Sekunden (statt wie in Produktion täglich um 01:00 Uhr). Warten Sie kurz...
+
+Prüfen Sie:
+
+- Die Datei wurde nach `scan_archive` verschoben
+
+- In der Datenbank-Tabelle `access_log` sind neue Einträge sichtbar
+
+---
+
+### 3. Share-Funktion testen
+
+- Klicken Sie im UI auf das **„Teilen“-Icon** eines Dokuments
+- Öffnen Sie den generierten Link in einem **Inkognito-Fenster**
+- Das Dokument wird geladen und der Zugriff in der **Datenbank protokolliert**
+
+---
+
+## ✅ Erfüllung der Anforderungen (Rating Matrix)
+
+| Kategorie        | Status | Implementierung                                                       |
+|------------------|--------|------------------------------------------------------------------------|
+| Use Cases        | ✅     | Upload, OCR, Search, Sharing vollständig umgesetzt                     |
+| Architecture     | ✅     | Saubere Trennung (API vs. Worker), Docker-Containerisierung            |
+| Non-Functional   | ✅     | Asynchrone Queues, Logging, Exception Handling                         |
+| Unit Tests       | ✅     | Business-Logik Tests mit Mockito (>70 % Coverage)                      |
+| Integration      | ✅     | E2E Tests gegen Docker-Umgebung (RestAssured)                                        |
+| Batch Job        | ✅     | Scheduled XML Import & Archivierung                                    |
+| Validation       | ✅     | Validierung im Frontend (Filetype) & Backend (DTOs)                    |
+
+---
+
+**Entwickler:** Mathuppurathu Martin & Wahba Fawzy
+**Semester:** Winter 2025/26
