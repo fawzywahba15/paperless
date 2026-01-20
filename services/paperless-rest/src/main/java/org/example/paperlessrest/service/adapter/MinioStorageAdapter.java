@@ -9,6 +9,10 @@ import org.springframework.stereotype.Component;
 import java.io.InputStream;
 import java.util.UUID;
 
+/**
+ * MinIO-Implementierung des Storage-Ports.
+ * Speichert Dateien in einem S3-kompatiblen Bucket.
+ */
 @Component
 public class MinioStorageAdapter implements DocumentStoragePort {
 
@@ -23,7 +27,9 @@ public class MinioStorageAdapter implements DocumentStoragePort {
 
     @Override
     public String store(String filename, String contentType, long size, InputStream data) throws Exception {
+        // Generiere eindeutigen Key, um Namenskollisionen zu vermeiden
         String objectKey = UUID.randomUUID() + "_" + filename;
+
         client.putObject(
                 PutObjectArgs.builder()
                         .bucket(bucket)

@@ -24,10 +24,15 @@ import java.io.InputStream;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+/**
+ * Unit-Test für den OcrConsumer.
+ * Simuliert den Workflow: RabbitMQ Msg -> MinIO Download -> Tesseract OCR -> DB Save -> Next Queue.
+ */
 @ExtendWith(MockitoExtension.class)
 class OcrConsumerTest {
 
@@ -44,13 +49,14 @@ class OcrConsumerTest {
     void setUp() {
         ocrConsumer = new OcrConsumer(repo, resultProducer, minioClient, rabbitTemplate, tesseract, elasticRepository);
 
+        // Properties setzen (normalerweise via @Value)
         ReflectionTestUtils.setField(ocrConsumer, "genAiQueue", "genai.queue");
         ReflectionTestUtils.setField(ocrConsumer, "bucketName", "paperless-bucket");
     }
 
     @Test
     void handle_ShouldProcessOcrAndSendToGenAi() throws Exception {
-        // Arrange
+        // --- ARRANGE ---
         UUID docId = UUID.randomUUID();
         DocumentMessage msg = new DocumentMessage(docId, "test.pdf");
 
@@ -60,23 +66,34 @@ class OcrConsumerTest {
         doc.setStatus(String.valueOf(DocumentStatus.PENDING));
 
         when(repo.findById(docId)).thenReturn(Optional.of(doc));
-        when(tesseract.doOCR(any(File.class))).thenReturn("Mocked OCR Text");
 
-        // MinIO Mocking
-        InputStream fakeStream = new ByteArrayInputStream("PDF".getBytes());
-        when(minioClient.getObject(any(GetObjectArgs.class))).thenReturn(new GetObjectResponse(null, "bucket", null, "obj", fakeStream));
+        // Tesseract Mock: Wir führen keine echte OCR durch, sondern geben Text zurück
+        when(tesseract.doOCR(any(File.class))).thenReturn("Mocked OCR Text Result");
 
-        // Act
+        // MinIO Mock: Wir simulieren einen Dateistream (PDF Inhalt)
+        InputStream fakeStream = new ByteArrayInputStream("PDF DUMMY CONTENT".getBytes());
+
+        GetObjectResponse mockResponse = new GetObjectResponse(null, "bucket", null, "obj", fakeStream);
+
+        when(minioClient.getObject(any(GetObjectArgs.class))).thenReturn(mockResponse);
+
+        // --- ACT ---
         ocrConsumer.handle(msg);
 
-        // Assert
+        // --- ASSERT ---
+        // 1. Status muss COMPLETED sein
         assertEquals(String.valueOf(DocumentStatus.COMPLETED), doc.getStatus());
-        assertEquals("Mocked OCR Text", doc.getOcrText());
 
-        // check, ob RabbitMQ benachrichtigt wurde
+        // 2. OCR Text muss gesetzt sein
+        assertEquals("Mocked OCR Text Result", doc.getOcrText());
+
+        // 3. RabbitMQ: Nachricht an GenAI Queue gesendet?
         verify(rabbitTemplate).convertAndSend(eq("genai.queue"), eq(msg));
 
-        // check, ob in ElasticSearch gespeichert wurde
+        // 4. ElasticSearch: Dokument indexiert?
         verify(elasticRepository, times(1)).save(any());
+
+        // 5. Result Producer (Success) aufgerufen?
+        verify(resultProducer).publishCompleted(eq(docId), anyString());
     }
 }

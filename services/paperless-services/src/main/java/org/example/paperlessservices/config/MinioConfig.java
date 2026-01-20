@@ -5,16 +5,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Konfiguration für den MinIO-Client im Worker-Service.
+ * Ermöglicht den Download von Dateien zur OCR-Verarbeitung.
+ */
 @Configuration
 public class MinioConfig {
 
-    @Value("${MINIO_ENDPOINT:http://minio:9000}")
+    @Value("${minio.endpoint}")
     private String endpoint;
 
-    @Value("${MINIO_ROOT_USER:minioadmin}")
+    @Value("${minio.access}")
     private String accessKey;
 
-    @Value("${MINIO_ROOT_PASSWORD:minioadmin}")
+    @Value("${minio.secret}")
     private String secretKey;
 
     @Bean

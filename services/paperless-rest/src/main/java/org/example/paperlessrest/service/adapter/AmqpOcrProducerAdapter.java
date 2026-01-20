@@ -9,6 +9,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
+/**
+ * RabbitMQ-Implementierung des Producer-Ports.
+ * Sendet Nachrichten an den OCR-Service.
+ */
 @Slf4j
 @Component
 public class AmqpOcrProducerAdapter implements OcrProducerPort {
@@ -27,10 +31,10 @@ public class AmqpOcrProducerAdapter implements OcrProducerPort {
         try {
             DocumentMessage message = new DocumentMessage(documentId, objectKey);
             rabbitTemplate.convertAndSend(ocrQueue, message);
-            log.info(" Sent message to OCR queue '{}': {}", ocrQueue, message);
+            log.info("Nachricht an OCR-Queue '{}' gesendet: {}", ocrQueue, message);
         } catch (Exception e) {
-            log.error("Failed to send message to OCR queue '{}'", ocrQueue, e);
-            throw new RuntimeException("Failed to send OCR message", e);
+            log.error("Fehler beim Senden an OCR-Queue '{}'", ocrQueue, e);
+            throw new RuntimeException("Konnte OCR-Nachricht nicht senden", e);
         }
     }
 }

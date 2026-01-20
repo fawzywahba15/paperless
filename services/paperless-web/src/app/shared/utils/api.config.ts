@@ -1,7 +1,9 @@
-// Einheitliche API-Konfiguration
+// Zentrale Konfiguration für API-Endpunkte
+// Nutzt relative Pfade, damit Nginx (Docker) und Proxy (Local) funktionieren.
 export const API_CONFIG = {
-  BASE_URL: 'http://localhost:8081/api',
+  BASE_URL: '/api',
   ENDPOINTS: {
-    DOCUMENTS: '/documents'
+    DOCUMENTS: '/documents',
+    SHARE: '/share'
   }
 };

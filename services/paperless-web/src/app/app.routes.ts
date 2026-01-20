@@ -1,7 +1,14 @@
 import { Routes } from '@angular/router';
-import {UploadFormComponent} from './shared/components/upload-form-component/upload-form-component';
+import { DashboardComponent } from './components/dashboard/dashboard.component';
+import { DocumentListComponent } from './components/document-list/document-list.component';
+import { DocumentDetailComponent } from './components/document-detail/document-detail.component';
 
 export const routes: Routes = [
-  { path: 'upload', component: UploadFormComponent },
-  { path: '', redirectTo: '/upload', pathMatch: 'full' } // optional: redirect auf /upload
+  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: 'dashboard', component: DashboardComponent },
+  { path: 'documents', component: DocumentListComponent },
+  { path: 'documents/:id', component: DocumentDetailComponent },
+
+  // Wildcard Route für 404
+  { path: '**', redirectTo: 'dashboard' }
 ];
