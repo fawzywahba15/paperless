@@ -138,7 +138,7 @@ docker-compose up -d --build
 | Dienst        | URL                       | Login                   | Beschreibung                         |
 |---------------|---------------------------|-------------------------|--------------------------------------|
 | Paperless UI  | http://localhost:8080     | –                       | Hauptanwendung                       |
-| API Docs      | http://localhost:8081/api | –                       | Backend-Endpunkte                    |
+| API Docs      | http://localhost:8081/swagger-ui/index.html | –     | Backend-Endpunkte                    |
 | DB Adminer    | http://localhost:9091     | paperless / paperless   | Server: postgres, DB: paperless      |
 | MinIO         | http://localhost:9090     | minioadmin / minioadmin | Dateispeicher                        |
 | RabbitMQ      | http://localhost:9093     | guest / guest           | Message Broker                       |
